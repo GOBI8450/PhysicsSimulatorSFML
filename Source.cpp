@@ -2,15 +2,14 @@
 #include <SFML/Window.hpp>
 #include <sstream>
 #include <iostream> using namespace std;
-#include "CircleBase.h";
-#include "BallsList.h";
-#include "LineLink.h";
+#include "CircleBase.h"
+#include "LineLink.h"
+#include "ObjectsList.h"
+#include "Grid.h"
 #include <random>  // For random number generation
 #include <ctime>   // For seeding with current time
 
-sf::Vector2f Vector2iConvertVector2f(sf::Vector2i vec) {
-    return sf::Vector2f(static_cast<float>(vec.x), static_cast<float>( vec.y));
-}
+
 
 std::vector<sf::Color> generateGradient(sf::Color startColor, sf::Color endColor, int steps) {
     std::vector<sf::Color> gradient;
@@ -35,9 +34,11 @@ int main()
     //Configaration
     sf::ContextSettings settings;
     settings.antialiasingLevel = 8;
-    int window_height = 1280;
-    int window_width = 920;
-    sf::RenderWindow window(sf::VideoMode(window_height, window_width), "TomySim", sf::Style::Default, settings);
+    int window_height = 920;
+    int window_width = 1280;
+    sf::RenderWindow window(sf::VideoMode(window_width, window_height), "TomySim", sf::Style::Default, settings);
+    float gridSize = 20;
+    ObjectsList objectList = ObjectsList();
 
     sf::Clock clock;
     sf::Clock fpsClock;
@@ -72,6 +73,7 @@ int main()
     sf::Color ball_color2 = sf::Color(50, 5, 11);
     sf::Color bg_color = sf::Color(30, 30, 30);
     sf::Color bb = sf::Color(44, 55, 100);
+    sf::Color explosion = sf::Color(205, 92, 8);
     sf::Color startColor = sf::Color(128, 0, 128);//purple
     sf::Color endColor = sf::Color(0, 0, 255);  //blue
     short int gradientStep = 0;
@@ -84,6 +86,10 @@ int main()
     // Define the range [1, 100] for the random number
     std::uniform_int_distribution<int> rnd_range(radius, 920-radius);
     sf::Vector2f otherStartP = sf::Vector2f(rnd_range(rnd), rnd_range(rnd));
+    float posYStartingPoint = 200;
+    int posXStartingPoint = radius;
+    short int startingPointAdder = 10;
+    sf::Vector2f spawnStartingPoint = sf::Vector2f(posXStartingPoint, posYStartingPoint);
 
     sf::Vector2i previousMousePos = sf::Mouse::getPosition(window);
     sf::Vector2i mousePos;
@@ -95,18 +101,20 @@ int main()
 
 
     //Config Ball
-    BallsList ballsList = BallsList();
     int disLine = 30;
-    LineLink lineLink=LineLink(disLine);
+    //LineLink lineLink=LineLink(disLine);
 
 
-    for (size_t i = 0; i < 15; i++)
+    /*for (size_t i = 0; i < 15; i++)
     {
         lineLink.NewBall(gravity, ball_color);
-    }
+    }*/
 
     while (window.isOpen())
     {
+        sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
+        sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePos);
+
         sf::Event event;
         while (window.pollEvent(event))
         {
@@ -117,16 +125,47 @@ int main()
                     window.close(); // Close the window
                 }
                 if (event.key.code == sf::Keyboard::A) {
-                    ballsList.NewBall(gravity,gradient[gradientStep]);
-                    ballsCount += 1;
-                    gradientStep += 1;
-                    if (gradientStep == gradientStepMax) {
-                        std::reverse(gradient.begin(),gradient.end());
-                        gradientStep = 0;
+                    for (size_t i = 0; i < 10; i++)
+                    {
+                        objectList.CreateNewCircle(gravity, gradient[gradientStep],spawnStartingPoint);
+                        ballsCount += 1;
+                        gradientStep += 1;
+                        spawnStartingPoint.x += startingPointAdder;
+                        if (gradientStep == gradientStepMax) {
+                            std::reverse(gradient.begin(), gradient.end());
+                            gradientStep = 0;
+                        }
+                        if (spawnStartingPoint.x>=window_width-radius||spawnStartingPoint.x<=radius)
+                        {
+                            startingPointAdder *= -1;
+                        }
                     }
                     //Linking shit@#$@@#$@#@##$$@#
-                    lineLink.NewBall(ballsList.ballsList[ballsList.ballsList.size()-1]);
+                    //lineLink.NewBall(ballsList.ballsList[ballsList.ballsList.size()-1]);
                 }
+
+                if (event.key.code == sf::Keyboard::H) {
+                    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+                    for (size_t i = 0; i < 3; i++)
+                    {
+                        objectList.CreateNewCircle(gravity, gradient[gradientStep], mousePosFloat);
+                        ballsCount += 1;
+                    }
+                }
+                if (event.key.code == sf::Keyboard::F) {
+                    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+                    objectList.CreateNewCircle(gravity, explosion, sf::Vector2f(mousePosFloat.x+3,mousePosFloat.y+3));
+                    for (size_t i = 0; i < 50; i++)
+                    {
+                        objectList.CreateNewCircle(gravity, explosion, mousePosFloat);
+                        ballsCount += 1;
+                    }
+                }
+                if (event.key.code == sf::Keyboard::R) {
+                    objectList.DeleteAll();
+                    ballsCount = 0;
+                }
+
                 if (mouseFlagClick&&event.key.code == sf::Keyboard::S)
                 {
                     scaleFlag = true;
@@ -151,10 +190,8 @@ int main()
 
         }
 
-        sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
         if (sf::Mouse::isButtonPressed(sf::Mouse::Left)&&mouseFlagClick==false) {
-            sf::Vector2i mousePos = sf::Mouse::getPosition(window); // Get the mouse position
-            thisBallPointer = ballsList.IsInRadius(mousePos); // Check if a circle is within radius
+            thisBallPointer = objectList.IsInRadius(currentMousePos); // Check if a circle is within radius
 
             if (thisBallPointer != nullptr) { // Check if a circle was found
                 mouseFlagClick = true; // Set flag if circle found
@@ -189,8 +226,8 @@ int main()
         }
 
         window.clear(bg_color);
-        ballsList.MoveAndDraw(window,currentFPS,elastic);
-        lineLink.MakeLinks(window,60);
+        //lineLink.MakeLinks(window,60);
+        objectList.MoveAndDraw(window, currentFPS, elastic);
 
         // Update the FPS text
         std::ostringstream oss;
@@ -201,7 +238,8 @@ int main()
         window.draw(fpsText);
         ballsCountText.setString(ossCount.str());
         window.draw(ballsCountText);
-        lineLink.Draw(window);
+        //lineLink.Draw(window);
+
         window.display();
 
         // Update the previous mouse position
