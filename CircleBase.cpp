@@ -95,21 +95,9 @@ public:
         setPosition(pos);
     }
 
-    std::vector<double> DistanceAndAngle(CircleBase otherCir) {
+    double DistanceOnly(CircleBase* otherCir) {
         sf::Vector2f pos = getPosition();
-        sf::Vector2f posOther = otherCir.getPosition();  // Correct this line
-        double x1 = pos.x;
-        double y1 = pos.y;
-        double x2 = posOther.x;
-        double y2 = posOther.y;
-        double distance = sqrt(pow((y2 - y1), 2) + pow((x2 - x1), 2));
-        double angle = atan2(y2 - y1, x2 - x1);
-        return { distance,angle };
-    }
-
-    double DistanceOnly(CircleBase otherCir) {
-        sf::Vector2f pos = getPosition();
-        sf::Vector2f posOther = otherCir.getPosition();  // Correct this line
+        sf::Vector2f posOther = otherCir->getPosition();  // Correct this line
         double x1 = pos.x;
         double y1 = pos.y;
         double x2 = posOther.x;
@@ -117,24 +105,24 @@ public:
         return sqrt(pow((y2 - y1), 2) + pow((x2 - x1), 2));
     }
 
-    bool IsCollision(CircleBase otherCir) {
+    bool IsCollision(CircleBase* otherCir) {
         double distance = DistanceOnly(otherCir);
-        if (distance <= radius + otherCir.radius) {
+        if (distance <= radius + otherCir->radius) {
             return true;
         }
         return false;
     }
 
     //The collision handeling is done by seperating the two circles with a vector between the two of them, and the overlap of them. the speed that will be created is done by verlet integretion
-    void handleCollision(CircleBase& otherCir) {
+    void handleCollision(CircleBase* otherCir) {
         if (IsCollision(otherCir)) {
             // Get positions of both circles
             sf::Vector2f pos = getPosition();
-            sf::Vector2f posOther = otherCir.getPosition();
+            sf::Vector2f posOther = otherCir->getPosition();
 
             // Calculate the distance and overlap
             double distance = DistanceOnly(otherCir);
-            double overlap = (radius + otherCir.radius) - distance;
+            double overlap = (radius + otherCir->radius) - distance;
 
             if (overlap > 0) {
                 sf::Vector2f direction = pos - posOther;//The direction vector, between center points of the circles
@@ -142,7 +130,7 @@ public:
                 if (length > 0) { //if there is any length between them we should devide the direction by the length so it will give only the direction, like you dont say go right 5km you say go right.
                     direction /= length; // Normalize the direction vector
                 }
-                float massRatio = mass/otherCir.mass;
+                float massRatio = mass/otherCir->mass;
                 // Move circles apart based on the overlap so they will no longer be in contact
                 sf::Vector2f displacement = direction * static_cast<float>(overlap / 2.0f); // Split overlap
                 pos += displacement;  // Move this circle
@@ -150,17 +138,17 @@ public:
 
                 // Update positions
                 setPosition(pos);
-                otherCir.setPosition(posOther);
+                otherCir->setPosition(posOther);
             }
         }
     }
 
     //
-    void handleCollisionElastic(CircleBase& otherCir, float elastic) {
+    void handleCollisionElastic(CircleBase* otherCir, float elastic) {
         if (IsCollision(otherCir)) {
             // Current positions
             sf::Vector2f pos = getPosition();
-            sf::Vector2f posOther = otherCir.getPosition();
+            sf::Vector2f posOther = otherCir->getPosition();
 
             // Calculate the normal vector
             sf::Vector2f normal = pos - posOther;
@@ -169,30 +157,30 @@ public:
 
             // Calculate relative velocity using position difference
             sf::Vector2f velocity = pos - oldPosition;
-            sf::Vector2f velocityOther = posOther - otherCir.oldPosition;
+            sf::Vector2f velocityOther = posOther - otherCir->oldPosition;
             sf::Vector2f relativeVelocity = velocity - velocityOther;
 
             // Calculate impulse scalar
             // Coefficient of restitution (0.8 = slightly bouncy)
             float impulseScalar = -(1 + elastic) * (relativeVelocity.x * normal.x + relativeVelocity.y * normal.y) /
-                (1 / mass + 1 / otherCir.mass);// This is like friction, if this is 0 means tottaly elastic. if more than 0 than the friction will be more and more noticable.
+                (1 / mass + 1 / otherCir->mass);// This is like friction, if this is 0 means tottaly elastic. if more than 0 than the friction will be more and more noticable.
 
             // Apply impulse
             sf::Vector2f impulse = normal * impulseScalar;
             sf::Vector2f newVelocity = velocity + impulse / static_cast<float>(mass);
-            sf::Vector2f newVelocityOther = velocityOther - impulse / static_cast<float>(otherCir.mass);
+            sf::Vector2f newVelocityOther = velocityOther - impulse / static_cast<float>(otherCir->mass);
 
             // Update positions and oldPositions
             oldPosition = pos;
-            otherCir.oldPosition = posOther;
+            otherCir->oldPosition = posOther;
             setPosition(pos + newVelocity);//!This is the part that do the hit physicly accurate, we add the new velocity to the position like euler integration!
-            otherCir.setPosition(posOther + newVelocityOther);//!This is the part that do the hit physicly accurate, we add the new velocity to the position like euler integration!
+            otherCir->setPosition(posOther + newVelocityOther);//!This is the part that do the hit physicly accurate, we add the new velocity to the position like euler integration!
 
             // Separate circles to prevent sticking
-            float overlap = (radius + otherCir.radius) - distance;
+            float overlap = (radius + otherCir->radius) - distance;
             sf::Vector2f separation = normal * (overlap / 2.0f);
             setPosition(getPosition() + separation);
-            otherCir.setPosition(otherCir.getPosition() - separation);
+            otherCir->setPosition(otherCir->getPosition() - separation);
         }
     }
 
