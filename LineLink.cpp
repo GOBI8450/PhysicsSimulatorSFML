@@ -88,8 +88,9 @@ public:
     void HandleCollisionsInList(sf::RenderWindow& window) {
         for (size_t i = 0; i < circleLink.size()-1; i++)
         {
-            circleLink[i].handleWallCollision(window);
-            circleLink[i].handleCollision(circleLink[i+1]);
+            /*circleLink[i].handleWallCollision(window);
+            CircleBase* circlePointer = circleLink[i + 1];
+            circleLink[i].handleCollision(circleLink[i+1]);*/
         }
     }
 
