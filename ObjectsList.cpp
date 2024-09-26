@@ -4,6 +4,8 @@
 #include "CircleBase.h";
 #include <iostream> using namespace std;
 #include <thread>
+#include <functional>
+#include <atomic>
 
 
 class ObjectsList
@@ -19,17 +21,17 @@ public:
     ObjectsList() { // Adjust cell size as needed
         rnd.seed(static_cast<unsigned>(std::time(nullptr)));
     }
-    ~ObjectsList() {
+
+    ~ObjectsList() { // Deleter or else memory leak ):
+        DeleteAll();
+    }
+
+    void DeleteAll() {
         for (auto ball : ballsList) {
             delete ball;
         }
-    }
-    
-    void DeleteAll() {
-        for (size_t i = 0; i < ballsList.size(); i++)
-        {
-            ballsList.clear();
-        }
+        ballsList.clear();
+        ballCount = 0;
     }
 
     void CreateNewCircle(float gravity, sf::Color color,sf::Vector2f pos) {
@@ -45,32 +47,36 @@ public:
         //std::cout << "Creating ball at position: (" << position.x << ", " << position.y << ")\n";
     }
 
-    void HandleAllCollisions(sf::RenderWindow& window, float elastic) {
-        if (elastic==0)
+    //Gets a vector of -> circleBase Objects vectors, and handles the collisions in them
+    void HandleCollisionsInRange(sf::RenderWindow& window, float elastic, std::vector<std::vector<CircleBase*>> vecOfVecObj) {
+        if (elastic==0)//Varlet integration
         {
-            for (auto& ball : ballsList) {
-                for (size_t i = 0; i < 2; i++)
-                {
+            for (auto& vecObj:vecOfVecObj)
+            {
+                for (auto& ball : vecObj) {
                     ball->handleWallCollision(window);
-                }
-                std::vector<CircleBase*> potentialCollisions = grid.GetNerbyCellsObjects(ball);
-                for (auto& otherBall : potentialCollisions) {
-                    if (&ball != &otherBall) {
-                        for (size_t i = 0; i < 1; i++)
-                        {
-                            ball->handleCollision(otherBall);
+                    std::vector<CircleBase*> potentialCollisions = grid.GetNerbyCellsObjects(ball);
+                    for (auto& otherBall : potentialCollisions) {
+                        if (ball != otherBall) {
+                            for (size_t i = 0; i < 1; i++)
+                            {
+                                ball->handleCollision(otherBall);
+                            }
                         }
                     }
                 }
-            }
+            } 
         }
-        else {
-            for (auto& ball : ballsList) {
-                ball->handleWallCollision(window);
-                std::vector<CircleBase*> potentialCollisions = grid.GetNerbyCellsObjects(ball);
-                for (auto& otherBall : potentialCollisions) {
-                    if (&ball != &otherBall) {
-                        ball->handleCollisionElastic(otherBall,elastic);
+        else { //Euler integration
+            for (auto& vecObj : vecOfVecObj)
+            {
+                for (auto& ball : vecObj) {
+                    ball->handleWallCollision(window);
+                    std::vector<CircleBase*> potentialCollisions = grid.GetNerbyCellsObjects(ball);
+                    for (auto& otherBall : potentialCollisions) {
+                        if (&ball != &otherBall) {
+                            ball->handleCollisionElastic(otherBall, elastic);
+                        }
                     }
                 }
             }
@@ -78,6 +84,50 @@ public:
 
     }
 
+
+    void MultiThreadChecks(sf::RenderWindow& window, float elastic) { //Get position negative problem
+        int hashMapSize = grid.GetHashMapSize();
+        std::vector<int> allHashKeys = grid.GetAllHashKeys();
+        size_t threadsNum = std::thread::hardware_concurrency();//How much threads will be
+        size_t eachThreadNeedTo = hashMapSize / threadsNum; // like if there is 10 grids, 5 threads -> each thread will handle 2.
+        if (eachThreadNeedTo < 1)
+        {
+            threadsNum = hashMapSize;
+        }
+        std::vector<std::thread> threadsVec;
+        int loopCount = 0;
+        for (size_t i = 0; i < threadsNum; i++)
+        {
+            std::vector<int> currentKeysVec;
+            size_t inner = static_cast<size_t>(hashMapSize / threadsNum);
+            for (size_t j = 0; j < inner; j++)
+            {
+                if (loopCount <= hashMapSize)
+                {
+                    currentKeysVec.push_back(allHashKeys[loopCount]);
+                    loopCount += 1;
+                }
+            }
+            std::vector<std::vector<CircleBase*>> currentCircleVector = grid.GetCircelsVectorOfVectorsFromKeyVectors(currentKeysVec);
+            std::thread tempThread (&ObjectsList::HandleCollisionsInRange,std::ref (window), elastic, currentCircleVector);
+            threadsVec.push_back(tempThread);
+        }
+        std::vector<int> currentKeysVec;
+        for (size_t i = 0; i < hashMapSize % threadsNum; i++)//all the remaining ones
+        {
+            if (loopCount <= hashMapSize)
+            {
+                currentKeysVec.push_back(allHashKeys[loopCount]);
+                loopCount += 1;
+            }
+        }
+        std::vector<std::vector<CircleBase*>> currentCircleVector = grid.GetCircelsVectorOfVectorsFromKeyVectors(currentKeysVec);
+        HandleCollisionsInRange(window, elastic, currentCircleVector);
+        for (size_t i = 0; i < threadsVec.size(); i++)
+        {
+            threadsVec[i].join();
+        }
+    }
 
     CircleBase* IsInRadius(sf::Vector2i pointPos) {
         return grid.IsInGridRadius(pointPos); // Return nullptr if no ball contains the point
@@ -85,6 +135,7 @@ public:
 
     void MoveAndDraw(sf::RenderWindow& window, float fps, float elastic)
     {
+
         grid.clear();
         for (auto& ball : ballsList) {
             grid.InsertCircle(ball);
@@ -93,39 +144,12 @@ public:
             fps = 60;
         }  // 60 FPS if the frame rate is undefined
         float deltaTime = 1 / fps;
-
+        MultiThreadChecks(window, elastic);
         for (auto& ball : ballsList)
         {
 
             ball->updatePosition(deltaTime);  // Ensure deltaTime is reasonable
             ball->draw(window);
-        }
-        for (size_t i = 0; i < 1; i++)
-        {
-            HandleAllCollisions(window,elastic);
-        }
-    }
-
-    void MultiThreadChecks(sf::RenderWindow& window, float elastic) {
-        int size = grid.GetHashMapSize();
-        std::vector<std::thread> threadsVec(size);
-        int threadsNum = 8;//How much threads will be
-        
-        for (size_t i = 0; i < threadsNum; i++)
-        {
-            for (size_t j = 0; j < size/threadsNum; j++)
-            {
-                threadsVec[j] = std::thread(HandleAllCollisions,window,elastic);
-            }
-        }
-        for (size_t i = 0; i < size%threadsNum; i++)//all the remaining ones
-        {
-            threadsVec[i] = std::thread(HandleAllCollisions, window, elastic);
-        }
-
-        for (size_t i = 0; i < size; i++)
-        {
-            threadsVec[i].join();
         }
     }
 
