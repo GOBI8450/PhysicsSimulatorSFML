@@ -1,11 +1,12 @@
 #pragma once
-#include <random> 
+#include <random>
 #include "Grid.h"
-#include "CircleBase.h";
-#include <iostream> using namespace std;
+#include "CircleBase.h"
+#include <iostream>
 #include <thread>
 #include <functional>
 #include <atomic>
+#include "ThreadPool.h" // Include the ThreadPool header
 
 
 class ObjectsList
@@ -35,7 +36,7 @@ public:
     }
 
     void CreateNewCircle(float gravity, sf::Color color,sf::Vector2f pos) {
-        std::uniform_int_distribution<int> radiusRange(2, 2); 
+        std::uniform_int_distribution<int> radiusRange(5, 5); 
         std::uniform_int_distribution<int> massRange(1, 1);
         std::uniform_int_distribution<int> rndXRange(300, 500);  // Replace 920 with actual window width
         //std::uniform_int_distribution<int> rndYRange(50, 1280 - 50); // Replace 1280 with actual window height
@@ -83,51 +84,82 @@ public:
         }
 
     }
-
-
-    void MultiThreadChecks(sf::RenderWindow& window, float elastic) { //Get position negative problem
-        int hashMapSize = grid.GetHashMapSize();
-        std::vector<int> allHashKeys = grid.GetAllHashKeys();
-        size_t threadsNum = std::thread::hardware_concurrency();//How much threads will be
-        size_t eachThreadNeedTo = hashMapSize / threadsNum; // like if there is 10 grids, 5 threads -> each thread will handle 2.
-        if (eachThreadNeedTo < 1)
+    void HandleAllCollisions(sf::RenderWindow& window, float elastic) {
+        if (elastic == 0)
         {
-            threadsNum = hashMapSize;
-        }
-        std::vector<std::thread> threadsVec;
-        int loopCount = 0;
-        for (size_t i = 0; i < threadsNum; i++)
-        {
-            std::vector<int> currentKeysVec;
-            size_t inner = static_cast<size_t>(hashMapSize / threadsNum);
-            for (size_t j = 0; j < inner; j++)
-            {
-                if (loopCount <= hashMapSize)
+            for (auto& ball : ballsList) {
+                for (size_t i = 0; i < 2; i++)
                 {
-                    currentKeysVec.push_back(allHashKeys[loopCount]);
-                    loopCount += 1;
+                    ball->handleWallCollision(window);
+                }
+                std::vector<CircleBase*> potentialCollisions = grid.GetNerbyCellsObjects(ball);
+                for (auto& otherBall : potentialCollisions) {
+                    if (&ball != &otherBall) {
+                        for (size_t i = 0; i < 1; i++)
+                        {
+                            ball->handleCollision(otherBall);
+                        }
+                    }
                 }
             }
-            std::vector<std::vector<CircleBase*>> currentCircleVector = grid.GetCircelsVectorOfVectorsFromKeyVectors(currentKeysVec);
-            std::thread tempThread (&ObjectsList::HandleCollisionsInRange,std::ref (window), elastic, currentCircleVector);
-            threadsVec.push_back(tempThread);
         }
-        std::vector<int> currentKeysVec;
-        for (size_t i = 0; i < hashMapSize % threadsNum; i++)//all the remaining ones
-        {
-            if (loopCount <= hashMapSize)
-            {
-                currentKeysVec.push_back(allHashKeys[loopCount]);
-                loopCount += 1;
+        else {
+            for (auto& ball : ballsList) {
+                ball->handleWallCollision(window);
+                std::vector<CircleBase*> potentialCollisions = grid.GetNerbyCellsObjects(ball);
+                for (auto& otherBall : potentialCollisions) {
+                    if (&ball != &otherBall) {
+                        ball->handleCollisionElastic(otherBall, elastic);
+                    }
+                }
             }
         }
-        std::vector<std::vector<CircleBase*>> currentCircleVector = grid.GetCircelsVectorOfVectorsFromKeyVectors(currentKeysVec);
-        HandleCollisionsInRange(window, elastic, currentCircleVector);
-        for (size_t i = 0; i < threadsVec.size(); i++)
-        {
-            threadsVec[i].join();
-        }
     }
+
+
+    //void MultiThreadChecks(sf::RenderWindow& window, float elastic) { //Get position negative problem
+    //    int hashMapSize = grid.GetHashMapSize();
+    //    std::vector<int> allHashKeys = grid.GetAllHashKeys();
+    //    size_t threadsNum = std::thread::hardware_concurrency();//How much threads will be
+    //    size_t eachThreadNeedTo = hashMapSize / threadsNum; // like if there is 10 grids, 5 threads -> each thread will handle 2.
+    //    if (eachThreadNeedTo < 1)
+    //    {
+    //        threadsNum = hashMapSize;
+    //    }
+    //    std::vector<std::thread> threadsVec;
+    //    int loopCount = 0;
+    //    for (size_t i = 0; i < threadsNum; i++)
+    //    {
+    //        std::vector<int> currentKeysVec;
+    //        size_t inner = static_cast<size_t>(hashMapSize / threadsNum);
+    //        for (size_t j = 0; j < inner; j++)
+    //        {
+    //            if (loopCount <= hashMapSize)
+    //            {
+    //                currentKeysVec.push_back(allHashKeys[loopCount]);
+    //                loopCount += 1;
+    //            }
+    //        }
+    //        std::vector<std::vector<CircleBase*>> currentCircleVector = grid.GetCircelsVectorOfVectorsFromKeyVectors(currentKeysVec);
+    //        std::thread tempThread (&ObjectsList::HandleCollisionsInRange,std::ref (window), elastic, currentCircleVector);
+    //        threadsVec.push_back(tempThread);
+    //    }
+    //    std::vector<int> currentKeysVec;
+    //    for (size_t i = 0; i < hashMapSize % threadsNum; i++)//all the remaining ones
+    //    {
+    //        if (loopCount <= hashMapSize)
+    //        {
+    //            currentKeysVec.push_back(allHashKeys[loopCount]);
+    //            loopCount += 1;
+    //        }
+    //    }
+    //    std::vector<std::vector<CircleBase*>> currentCircleVector = grid.GetCircelsVectorOfVectorsFromKeyVectors(currentKeysVec);
+    //    HandleCollisionsInRange(window, elastic, currentCircleVector);
+    //    for (size_t i = 0; i < threadsVec.size(); i++)
+    //    {
+    //        threadsVec[i].join();
+    //    }
+    //}
 
     CircleBase* IsInRadius(sf::Vector2i pointPos) {
         return grid.IsInGridRadius(pointPos); // Return nullptr if no ball contains the point
@@ -144,7 +176,7 @@ public:
             fps = 60;
         }  // 60 FPS if the frame rate is undefined
         float deltaTime = 1 / fps;
-        MultiThreadChecks(window, elastic);
+        HandleAllCollisions(window, elastic);
         for (auto& ball : ballsList)
         {
 
