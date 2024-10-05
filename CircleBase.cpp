@@ -1,35 +1,31 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <iostream> 
+#include "BaseShape.h"
 
 // Base_Shape class inheriting from sf::Transformable
-class CircleBase : public sf::CircleShape
+class Circle : public BaseShape, public sf::CircleShape
 {
 private:
-    sf::Vector2f oldPosition; //Vector for X axis and Y axis
-    sf::Vector2f acceleration; //Vector for X axis and Y axis
     float radius; //float to not be too big
-    sf::Color color; 
-    float gravity; // float to not be too strong
-    double mass;//be as fat as you want brotha
-    double fps;//my worst enemy
 
 
 public:
     // Constructor with radius, color, gravity, mass
-    CircleBase(float radius, sf::Color color, float gravity, double mass)
-        : radius(radius), color(color), gravity(gravity), mass(mass)
+    Circle(sf::Color color, float gravity, double mass, float radius)
+        : BaseShape(color, gravity, mass),radius(radius)
     {
         setRadius(radius);
         setFillColor(color);
         setOrigin(radius, radius);
         setPosition(radius,radius);
         oldPosition = sf::Vector2f(radius,radius);
-        acceleration = sf::Vector2f(0, gravity*100); //(x axis, y axis)
+        acceleration = sf::Vector2f(0, gravity * 100); //(x axis, y axis)
     }
+
     // Constructor with radius, color, gravity, mass, position
-    CircleBase(float radius, sf::Color color, sf::Vector2f pos, float gravity, double mass)
-        : radius(radius), color(color), gravity(gravity), mass(mass)
+    Circle(float radius, sf::Color color, sf::Vector2f pos, float gravity, double mass)
+        : BaseShape(color, gravity, mass), radius(radius)
     {
         setRadius(radius);
         setFillColor(color);
@@ -39,73 +35,54 @@ public:
         acceleration = sf::Vector2f(0, gravity*100);//(x axis, y axis)
     }
 
-    void updatePosition(float dt)
-    {
-        sf::Vector2f currentPos = getPosition();
-        sf::Vector2f velocity = currentPos - oldPosition;
-        oldPosition = currentPos;// updating the current position to the old one
-        sf::Vector2f newPos = currentPos + velocity + (acceleration * (dt * dt)); // Like tomy teached -> x=x0+vt+1/2*a*t^2, thanks Tomy
-        setPosition(newPos);
-    }
-
-    //if you wanna apply force to the circle:
-    void applyForce(sf::Vector2f force)
-    {
-        acceleration += force / static_cast<float>(mass); //because m*a = F --> a = F/m by newton second law
-    }
-
-    // Set shape color
-    void setColor(sf::Color newColor)
-    {
-        color = newColor;  // Update the member variable
-        setFillColor(newColor);
-    }
-
+    //Function that handles the walls collisons:
     void handleWallCollision(sf::RenderWindow& window)
     {
-        sf::Vector2f pos = getPosition();
+        sf::Vector2f pos =GetPosition();
         sf::Vector2u windowSize = window.getSize();
-        float energyLossFactor = 1;// If you wanna add energy loss
-        if (pos.x - radius < 0)
+        float energyLossFactor = 0;// If you wanna add energy loss
+        //as the origin point is set to the center of the circle the point will be always radius far away from its edges
+        if (pos.x - radius < 0) 
         {
             oldPosition.x = pos.x;
             pos.x = radius;
-            //oldPosition.x = pos.x + (pos.x - oldPosition.x) * energyLossFactor; // 0.9f Damping factor
+            oldPosition.x = pos.x + (pos.x - oldPosition.x) * energyLossFactor; // 0.9f Damping factor
         }
         else if (pos.x + radius > windowSize.x)
         {
             oldPosition.x = pos.x;
             pos.x = windowSize.x - radius;
-            //oldPosition.x = pos.x + (pos.x - oldPosition.x) * energyLossFactor;
+            oldPosition.x = pos.x + (pos.x - oldPosition.x) * energyLossFactor;
         }
 
         if (pos.y - radius < 0)
         {
             oldPosition.y = pos.y;
             pos.y = radius;
-            //oldPosition.y = pos.y + (pos.y - oldPosition.y) * energyLossFactor;
+            oldPosition.y = pos.y + (pos.y - oldPosition.y) * energyLossFactor;
         }
         else if (pos.y + radius > windowSize.y)
         {
             oldPosition.y = pos.y;
             pos.y = windowSize.y - radius;
-            //oldPosition.y = pos.y + (pos.y - oldPosition.y) * energyLossFactor;
+            oldPosition.y = pos.y + (pos.y - oldPosition.y) * energyLossFactor;
         }
 
         setPosition(pos);
     }
-
-    double DistanceOnly(CircleBase* otherCir) {
-        sf::Vector2f pos = getPosition();
-        sf::Vector2f posOther = otherCir->getPosition();  // Correct this line
+    double DistanceOnly(Circle* otherShape) {
+        sf::Vector2f pos = GetPosition();       // Position of this shape
+        sf::Vector2f posOther = otherShape->GetPosition(); // Position of the other shape
         double x1 = pos.x;
         double y1 = pos.y;
         double x2 = posOther.x;
         double y2 = posOther.y;
-        return sqrt(pow((y2 - y1), 2) + pow((x2 - x1), 2));
+        return std::sqrt(std::pow((y2 - y1), 2) + std::pow((x2 - x1), 2)); // Return distance
     }
 
-    bool IsCollision(CircleBase* otherCir) {
+
+    //Checks if there is any collision between two balls
+    bool IsCollision(Circle* otherCir) {
         double distance = DistanceOnly(otherCir);
         if (distance <= radius + otherCir->radius) {
             return true;
@@ -114,11 +91,11 @@ public:
     }
 
     //The collision handeling is done by seperating the two circles with a vector between the two of them, and the overlap of them. the speed that will be created is done by verlet integretion
-    void handleCollision(CircleBase* otherCir) {
+    void HandleCollision(Circle* otherCir) {
         if (IsCollision(otherCir)) {
             // Get positions of both circles
-            sf::Vector2f pos = getPosition();
-            sf::Vector2f posOther = otherCir->getPosition();
+            sf::Vector2f pos = GetPosition();
+            sf::Vector2f posOther = otherCir->GetPosition();
 
             // Calculate the distance and overlap
             double distance = DistanceOnly(otherCir);
@@ -143,12 +120,12 @@ public:
         }
     }
 
-    //
-    void handleCollisionElastic(CircleBase* otherCir, float elastic) {
+    //handeling collision with euler integretion, using momentum equations
+    void HandleCollisionElastic(Circle* otherCir, float elastic) {
         if (IsCollision(otherCir)) {
             // Current positions
-            sf::Vector2f pos = getPosition();
-            sf::Vector2f posOther = otherCir->getPosition();
+            sf::Vector2f pos = GetPosition();
+            sf::Vector2f posOther = otherCir->GetPosition();
 
             // Calculate the normal vector
             sf::Vector2f normal = pos - posOther;
@@ -179,25 +156,48 @@ public:
             // Separate circles to prevent sticking
             float overlap = (radius + otherCir->radius) - distance;
             sf::Vector2f separation = normal * (overlap / 2.0f);
-            setPosition(getPosition() + separation);
-            otherCir->setPosition(otherCir->getPosition() - separation);
+            setPosition(GetPosition() + separation);
+            otherCir->setPosition(otherCir->GetPosition() - separation);
         }
     }
 
+    //Set the radius to a new one, and centers the origin point according to the new radius
     void SetRadiusAndCenter(int newRadius) {
         setRadius(newRadius);
         radius = newRadius;
         setOrigin(sf::Vector2f(radius, radius));
     }
 
-    void SetMass(double newMass) {mass = newMass;}
+    //Updates the position following varlet integration. meaning we calculate the next position based on the previos one and with time
+    void updatePosition(float dt) override
+    {
+        sf::Vector2f currentPos = GetPosition();
+        sf::Vector2f velocity = currentPos - oldPosition;
+        oldPosition = currentPos;// updating the current position to the old one
+        sf::Vector2f newPos = currentPos + velocity + (acceleration * (dt * dt)); // Similar to what tomy teached -> x=x0+vt+1/2*a*t^2, yet here it is x=x0+v+a*t^2 thanks Tomy
+        setPosition(newPos);
+    }
 
-    double GetMass() {return mass;}
+    // Set shape color
+    void setColor(sf::Color newColor) override
+    {
+        color = newColor;  // Update the member variable
+        setFillColor(newColor);
+    }
 
-    // Function to draw the shape, passing the render window
+    void SetPosition(sf::Vector2f newPos) override
+    {
+        setPosition(newPos);
+    }
+
+    sf::Vector2f GetPosition() override {
+        return getPosition();
+    }
+
+
+    // Function to draw the circle
     void draw(sf::RenderWindow& window)
     {
         window.draw(*this);
     }
-
 };
