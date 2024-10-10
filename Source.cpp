@@ -243,8 +243,9 @@ int main()
     std::vector<std::pair< Button, bool>> settingsButtonVec;
     settingsButtonVec.push_back(std::make_pair(fullscreenButton, false));
     settingsButtonVec.push_back(std::make_pair(exitButtonSettings, false));
-
-
+    
+    //float innerGravity, sf::Color color, sf::Vector2f pos, float radius, float mass
+    objectList.CreateNewPlanet(1000,ball_color,sf::Vector2f(200,200), 100, 5.9722 * pow(10, 24));
 
     //Config Ball line link
     //int disLine = 30;
