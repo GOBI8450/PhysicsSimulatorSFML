@@ -12,7 +12,7 @@ protected:
     double fps;//my worst enemy
 
 public:
-    BaseShape(sf::Color color, float gravity, double mass)
+    BaseShape (sf::Color color, float gravity, double mass)
         : color(color), gravity(gravity), mass(mass)
     {
         acceleration = sf::Vector2f(0, gravity ); //(x axis, y axis)
