@@ -3,6 +3,7 @@
 #include "Grid.h"
 #include "CircleBase.h"
 #include "Rectangle.h"
+#include "Planet.h"
 #include <iostream>
 #include <thread>
 #include <functional>
@@ -15,6 +16,7 @@ private:
     int ballCount = 0;
     std::mt19937 rnd;
     Grid grid;
+    std::vector<Planet*> planetList;
 
 public:
     std::vector<BaseShape*> ballsList;  // Changed to BaseShape* to store any shapes that derive from BaseShape
@@ -50,9 +52,19 @@ public:
         // std::cout << "Creating ball at position: (" << position.x << ", " << position.y << ")\n";
     }
 
+    void CreateNewPlanet(float innerGravity, sf::Color color, sf::Vector2f pos, float radius, float mass) {
+        std::uniform_int_distribution<int> rndXRange(300, 500);
+        float gravity = 0;
+        Planet* planet = new Planet(radius, color, pos, gravity, mass, innerGravity);        //^^^^^^float radius, sf::Color color, sf::Vector2f pos, float gravity, double mass, float innerGravity^^^^
+        Planet* planetCopy = new Planet(*planet);  // Correct way to create a copy        //^^^^^^float radius, sf::Color color, sf::Vector2f pos, float gravity, double mass, float innerGravity^^^^
+        ballsList.push_back(planet); // Pushing back the BaseShape* into the vector
+        planetList.push_back(planetCopy); // Pushing back the BaseShape* into the vector
+        ballCount += 1;
+    }
+
     void CreateNewRectangle(float gravity, sf::Color color, sf::Vector2f pos) {
-        std::uniform_int_distribution<int> heightRange(15, 15);
-        std::uniform_int_distribution<int> widthRange(15, 15);
+        std::uniform_int_distribution<int> heightRange(50, 50);
+        std::uniform_int_distribution<int> widthRange(50, 50);
         std::uniform_int_distribution<int> rndXRange(300, 500);  // Replace 920 with actual window width
         // std::uniform_int_distribution<int> rndYRange(50, 1280 - 50); // Replace 1280 with actual window height
         int randomHeight=heightRange(rnd);
@@ -249,6 +261,10 @@ public:
         return grid.IsInGridRadius(pointPos); // Return nullptr if no ball contains the point
     }
 
+    void handlePlanetGravity(sf::RenderWindow& window) {
+        
+    }
+
     void MoveAndDraw(sf::RenderWindow& window, float fps, float elastic) {
         grid.clear(); // Clear the grid
 
@@ -259,10 +275,15 @@ public:
         if (fps <= 0) {
             fps = 60;
         }
-
         float deltaTime = 1 / fps; // Calculate deltaTime for movement
         HandleAllCollisions(window, elastic); // Handle all the collisions
-
+        for (auto& planet : planetList)
+        {
+            for (auto& ball : ballsList) {
+                std::cout << "balls";
+                planet->Gravitate(ball);
+            }
+        }
         for (auto& ball : ballsList) {
             ball->updatePosition(deltaTime);
             ball->draw(window);
