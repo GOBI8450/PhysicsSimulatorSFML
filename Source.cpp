@@ -2,7 +2,6 @@
 #include <SFML/Window.hpp>
 #include <sstream>
 #include <iostream> using namespace std;
-#include "CircleBase.h"
 #include "LineLink.h"
 #include "ObjectsList.h"
 #include "Grid.h"
@@ -19,7 +18,7 @@ struct {
     int window_height = desktopSize.height;
     int window_width = desktopSize.width;
     bool fullscreen = false;
-    float gravity = 9.8;
+    float gravity = 0;
     double massLock = 0;
 } options;
 
@@ -42,7 +41,7 @@ std::string Settings(sf::RenderWindow& window, sf::Color background_color, sf::R
         for (auto& button : buttonVec)
         {
             if (button.first.IsInRadius(mousePosFloat))
-            {   
+            {
                 //for better clicking experience
                 /*button.first.SetScale(1.5);
                 button.first.draw(window);
@@ -64,10 +63,10 @@ std::string Settings(sf::RenderWindow& window, sf::Color background_color, sf::R
     return "SETTINGS";
 }
 
-std::string MainMenu(sf::RenderWindow& window, sf::Color background_color,sf::RectangleShape headerText, std::vector<std::pair< Button, bool>> buttonVec) {
+std::string MainMenu(sf::RenderWindow& window, sf::Color background_color, sf::RectangleShape headerText, std::vector<std::pair< Button, bool>> buttonVec) {
     window.setTitle("Main Menu");
 
-    sf::Vector2u windowSize=window.getSize();
+    sf::Vector2u windowSize = window.getSize();
     sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
     sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePos);
     bool mouseClickFlag = false;
@@ -75,20 +74,20 @@ std::string MainMenu(sf::RenderWindow& window, sf::Color background_color,sf::Re
     while (window.pollEvent(event))
     {
         if (event.type == sf::Event::Closed) { window.close(); }
-        if (event.type == sf::Event::MouseButtonReleased) {mouseClickFlag = true;}
+        if (event.type == sf::Event::MouseButtonReleased) { mouseClickFlag = true; }
     }
     window.clear(background_color);
     if (mouseClickFlag)
     {
-        for (auto& pair:buttonVec)
+        for (auto& pair : buttonVec)
         {
             if (pair.first.IsInRadius(mousePosFloat))
-            { 
+            {
                 return pair.first.GetName();
             }
         }
     }
-    for (auto& button:buttonVec)
+    for (auto& button : buttonVec)
     {
         button.second = button.first.MouseHover(mousePosFloat, hovering);
     }
@@ -127,12 +126,15 @@ int main()
     //Configaration
     sf::ContextSettings settings;
     settings.antialiasingLevel = 8;
-    unsigned int window_height=options.window_height;
-    unsigned int window_width=options.window_width;
-    sf::RenderWindow window(sf::VideoMode(window_width, window_height), "TomySim", sf::Style::Default, settings);
+    sf::View view;
+    const float ZOOM_FACTOR = 1.1f;
+    unsigned int window_height = options.window_height;
+    unsigned int window_width = options.window_width;
+    sf::RenderWindow window(sf::VideoMode(window_width, window_height), "TomySim", sf::Style::Fullscreen, settings);
+    view = window.getDefaultView();
     float gridSize = 20;
     ObjectsList objectList = ObjectsList();
-
+    window.setFramerateLimit(60);
     sf::Clock clock;
     sf::Clock fpsClock;
     int frameCount = 0;
@@ -173,13 +175,13 @@ int main()
     sf::Color endColor = sf::Color(0, 0, 255);  //blue
     short int gradientStep = 0;
     short int gradientStepMax = 400;
-    std::vector<sf::Color> gradient = GenerateGradient(startColor,endColor,gradientStepMax);
+    std::vector<sf::Color> gradient = GenerateGradient(startColor, endColor, gradientStepMax);
     sf::Vector2f window_centerP = sf::Vector2f(window_height / 2, window_width / 2);
     //random config
     // Initialize random number generator with a seed based on the current time
     std::mt19937 rnd(static_cast<unsigned>(std::time(nullptr)));  // // Initialize random number generator with a seed based on the current time
     // Define the range [1, 100] for the random number
-    std::uniform_int_distribution<int> rnd_range(radius, 920-radius);
+    std::uniform_int_distribution<int> rnd_range(radius, 920 - radius);
     sf::Vector2f otherStartP = sf::Vector2f(rnd_range(rnd), rnd_range(rnd));
     float posYStartingPoint = 200;
     int posXStartingPoint = radius;
@@ -192,30 +194,32 @@ int main()
     bool mouseFlagScrollUp = false;
     bool mouseFlagScrollDown = false;
     int mouseScrollPower = 5;
-    BaseShape* thisBallPointer=nullptr;
+    BaseShape* thisBallPointer = nullptr;
+    float moveSpeedScreen = 100.f;
 
-    std::string screen = "MAIN MENU";
+
+    std::string screen = "START";
 
     float headerTextureResizer = 1.2;
-    sf::RectangleShape headerText=sf::RectangleShape(sf::Vector2f(1212/headerTextureResizer,80/headerTextureResizer));
-    headerText.setOrigin(headerText.getSize().x/2, headerText.getSize().y/2);
+    sf::RectangleShape headerText = sf::RectangleShape(sf::Vector2f(1212 / headerTextureResizer, 80 / headerTextureResizer));
+    headerText.setOrigin(headerText.getSize().x / 2, headerText.getSize().y / 2);
     headerText.setPosition(window_width / 2, window_height / 2 - 350);
     sf::Texture startButtonTexture;
     sf::Texture exitButtonTexture;
     sf::Texture settingsButtonTexture;
     sf::Texture mainMenuHeaderTexture;
-    if (!startButtonTexture.loadFromFile("START.png")) {return -1;}
-    if (!exitButtonTexture.loadFromFile("EXIT.png")) {return -1;}
-    if (!settingsButtonTexture.loadFromFile("SETTINGS.png")) {return -1;}
-    if (!mainMenuHeaderTexture.loadFromFile("Header.png")) {return -1;}
+    if (!startButtonTexture.loadFromFile("START.png")) { return -1; }
+    if (!exitButtonTexture.loadFromFile("EXIT.png")) { return -1; }
+    if (!settingsButtonTexture.loadFromFile("SETTINGS.png")) { return -1; }
+    if (!mainMenuHeaderTexture.loadFromFile("Header.png")) { return -1; }
     startButtonTexture.setSmooth(true);
     exitButtonTexture.setSmooth(true);
     settingsButtonTexture.setSmooth(true);
     mainMenuHeaderTexture.setSmooth(true);
     float textureResizer = 1.8;
-    Button startButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(window_width/2,450), "START");
-    Button settingsButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(window_width/2,675),"SETTINGS");
-    Button exitButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer,  sf::Vector2f(window_width/2,925), "EXIT");
+    Button startButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(window_width / 2, 450), "START");
+    Button settingsButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(window_width / 2, 675), "SETTINGS");
+    Button exitButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(window_width / 2, 925), "EXIT");
     startButtonMainMenu.SetTexture(startButtonTexture);
     settingsButtonMainMenu.SetTexture(settingsButtonTexture);
     exitButtonMainMenu.SetTexture(exitButtonTexture);
@@ -224,7 +228,7 @@ int main()
     mainMenuButtonVec.push_back(std::make_pair(startButtonMainMenu, false));
     mainMenuButtonVec.push_back(std::make_pair(settingsButtonMainMenu, false));
     mainMenuButtonVec.push_back(std::make_pair(exitButtonMainMenu, false));
-    
+
     //settings
     sf::RectangleShape settingsHeaderText = sf::RectangleShape(sf::Vector2f(555 / headerTextureResizer, 79 / headerTextureResizer));
     settingsHeaderText.setOrigin(settingsHeaderText.getSize().x / 2, settingsHeaderText.getSize().y / 2);
@@ -243,9 +247,11 @@ int main()
     std::vector<std::pair< Button, bool>> settingsButtonVec;
     settingsButtonVec.push_back(std::make_pair(fullscreenButton, false));
     settingsButtonVec.push_back(std::make_pair(exitButtonSettings, false));
-    
+
     //float innerGravity, sf::Color color, sf::Vector2f pos, float radius, float mass
-    objectList.CreateNewPlanet(1000,ball_color,sf::Vector2f(200,200), 100, 5.9722 * pow(10, 24));
+    objectList.CreateNewPlanet(7000, ball_color, sf::Vector2f(1980/2, 600), 20, 5.9722 * pow(10,24));
+    objectList.CreateNewPlanet(7000, ball_color, sf::Vector2f(1980/2-300, 600), 20, 5.9722 * pow(10,24));
+    sf::Vector2f initialVel = sf::Vector2f(4,0);
 
     //Config Ball line link
     //int disLine = 30;
@@ -261,7 +267,7 @@ int main()
 
     while (window.isOpen())
     {
-        if (screen=="START")
+        if (screen == "START")
         {
             sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
             sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePos);
@@ -270,6 +276,14 @@ int main()
             while (window.pollEvent(event))
             {
                 if (event.type == sf::Event::Closed) { window.close(); }
+                if (event.type == sf::Event::MouseWheelScrolled) {
+                    if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel) {
+                        if (event.mouseWheelScroll.delta > 0)
+                            view.zoom(1.f / ZOOM_FACTOR);
+                        else if (event.mouseWheelScroll.delta < 0)
+                            view.zoom(ZOOM_FACTOR);
+                    }
+                }
                 if (event.type == sf::Event::KeyPressed) {
                     if (event.key.code == sf::Keyboard::Escape) {
                         screen = "MAIN MENU";
@@ -280,7 +294,7 @@ int main()
                     if (event.key.code == sf::Keyboard::A) {
                         for (size_t i = 0; i < 10; i++)
                         {
-                            objectList.CreateNewCircle(gravity, gradient[gradientStep], spawnStartingPoint);
+                            objectList.CreateNewCircle(gravity, gradient[gradientStep], spawnStartingPoint,initialVel);
                             objCount += 1;
                             gradientStep += 1;
                             spawnStartingPoint.x += startingPointAdder;
@@ -313,21 +327,29 @@ int main()
                             }
                         }
                     }
+                    if (event.key.code == sf::Keyboard::Left)
+                        view.move(-moveSpeedScreen, 0.f);
+                    if (event.key.code == sf::Keyboard::Right)
+                        view.move(moveSpeedScreen, 0.f);
+                    if (event.key.code == sf::Keyboard::Up)
+                        view.move(0.f, -moveSpeedScreen);
+                    if (event.key.code == sf::Keyboard::Down)
+                        view.move(0.f, moveSpeedScreen);
 
                     if (event.key.code == sf::Keyboard::H) {
                         sf::Vector2i mousePos = sf::Mouse::getPosition(window);
                         for (size_t i = 0; i < 3; i++)
                         {
-                            objectList.CreateNewCircle(gravity, gradient[gradientStep], mousePosFloat);
+                            objectList.CreateNewCircle(gravity, gradient[gradientStep], mousePosFloat,initialVel);
                             objCount += 1;
                         }
                     }
                     if (event.key.code == sf::Keyboard::F) {
                         sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                        objectList.CreateNewCircle(gravity, explosion, sf::Vector2f(mousePosFloat.x + 3, mousePosFloat.y + 3));
+                        objectList.CreateNewCircle(gravity, explosion, sf::Vector2f(mousePosFloat.x + 3, mousePosFloat.y + 3), initialVel);
                         for (size_t i = 0; i < 50; i++)
                         {
-                            objectList.CreateNewCircle(gravity, explosion, mousePosFloat);
+                            objectList.CreateNewCircle(gravity, explosion, mousePosFloat, initialVel);
                             objCount += 1;
                         }
                     }
@@ -421,8 +443,10 @@ int main()
             }
 
             window.clear(background_color);
+            window.setView(view);
             //lineLink.MakeLinks(window,60);
             objectList.MoveAndDraw(window, currentFPS, elastic);
+            window.setView(window.getDefaultView());
 
             // Update the FPS text
             std::ostringstream oss;
@@ -448,10 +472,10 @@ int main()
                 sf::sleep(sf::seconds(targetFrameTime - elapsed.asSeconds()));
             }
         }
-        else if(screen=="MAIN MENU")
+        else if (screen == "MAIN MENU")
         {
 
-            screen= MainMenu(window, mainMenuBackgroundColor, headerText, mainMenuButtonVec);
+            screen = MainMenu(window, mainMenuBackgroundColor, headerText, mainMenuButtonVec);
 
         }
         else if (screen == "SETTINGS") {
