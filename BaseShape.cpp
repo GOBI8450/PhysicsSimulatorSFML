@@ -12,7 +12,7 @@ protected:
     double fps;//my worst enemy
 
 public:
-    BaseShape (sf::Color color, float gravity, double mass)
+    BaseShape(sf::Color color, float gravity, double mass)
         : color(color), gravity(gravity), mass(mass)
     {
         acceleration = sf::Vector2f(0, gravity ); //(x axis, y axis)
@@ -22,10 +22,8 @@ public:
     virtual void updatePosition(float dt){}
 
     //If you wanna apply force to the circle:
-    void applyForce(sf::Vector2f force)
-    {
-        acceleration += force / static_cast<float>(mass); //because m*a = F --> a = F/m by newton second law, Thank you Tomy
-    }
+    virtual void applyForce(sf::Vector2f force)
+    {}
 
     // Set shape color
     virtual void setColor(sf::Color newColor) {}
@@ -39,7 +37,7 @@ public:
     // Function to draw the circle
     virtual void draw(sf::RenderWindow& window){}
 
-    double DistanceOnly(BaseShape* otherShape) {
+    double Distance(BaseShape* otherShape) {
         sf::Vector2f pos = GetPosition();       // Position of this shape
         sf::Vector2f posOther = otherShape->GetPosition(); // Position of the other shape
         double x1 = pos.x;
@@ -61,5 +59,18 @@ public:
     virtual sf::Vector2f GetPosition() { return sf::Vector2f(0, 0); }
 
     virtual void SetPosition(sf::Vector2f newPos) {}
+
+    virtual void SetVelocity(const sf::Vector2f& newVelocity){}
+    virtual void SetVelocity(float x, float y) {}
+    virtual sf::Vector2f GetVelocity() const { return sf::Vector2f(); }
+
+    void SetAcceleration(sf::Vector2f newAcceleration) {
+        acceleration = newAcceleration;
+    }
+
+    sf::Vector2f GetAcceleration() {
+        return acceleration;
+    }
+
 };
 
