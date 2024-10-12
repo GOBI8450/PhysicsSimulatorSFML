@@ -4,10 +4,11 @@
 #include "BaseShape.h"
 
 // Base_Shape class inheriting from sf::Transformable
-class Circle : public BaseShape, public sf::CircleShape
+class Circle :public BaseShape, public sf::CircleShape
 {
 private:
     float radius; //float to not be too big
+    sf::Vector2f velocity;
 
 
 public:
@@ -24,7 +25,7 @@ public:
     }
 
     // Constructor with radius, color, gravity, mass, position
-    Circle(float radius, sf::Color color, sf::Vector2f pos, float gravity, double mass)
+    Circle(float radius, sf::Color color, sf::Vector2f pos, float gravity, double mass, sf::Vector2f initialVel)
         : BaseShape(color, gravity, mass), radius(radius)
     {
         setRadius(radius);
@@ -33,6 +34,32 @@ public:
         setPosition(pos);
         oldPosition = pos;
         acceleration = sf::Vector2f(0, gravity*100);//(x axis, y axis)
+        SetVelocity(initialVel);
+    }
+
+    void SetVelocity(const sf::Vector2f& newVelocity) override {
+        velocity = newVelocity;
+    }
+
+    void SetVelocity(float x, float y) override {
+        velocity.x = x;
+        velocity.y = y;
+    }
+
+    sf::Vector2f GetVelocity() const override {
+        return velocity;
+    }
+
+    // Modify the updatePosition method:
+    void updatePosition(float dt) override
+    {
+        sf::Vector2f currentPos = GetPosition();
+        sf::Vector2f newPos = currentPos + velocity * dt + (acceleration * (dt * dt * 0.5f));
+        oldPosition = currentPos;
+        setPosition(newPos);
+
+        // Update velocity for the next frame
+        velocity = (newPos - currentPos) / dt;
     }
 
     //Function that handles the walls collisons:
@@ -168,15 +195,7 @@ public:
         setOrigin(sf::Vector2f(radius, radius));
     }
 
-    //Updates the position following varlet integration. meaning we calculate the next position based on the previos one and with time
-    void updatePosition(float dt) override
-    {
-        sf::Vector2f currentPos = GetPosition();
-        sf::Vector2f velocity = currentPos - oldPosition;
-        oldPosition = currentPos;// updating the current position to the old one
-        sf::Vector2f newPos = currentPos + velocity + (acceleration * (dt * dt)); // Similar to what tomy teached -> x=x0+vt+1/2*a*t^2, yet here it is x=x0+v+a*t^2 thanks Tomy
-        setPosition(newPos);
-    }
+   
 
     // Set shape color
     void setColor(sf::Color newColor) override
@@ -193,7 +212,6 @@ public:
     sf::Vector2f GetPosition() override {
         return getPosition();
     }
-
 
 
     // Function to draw the circle
