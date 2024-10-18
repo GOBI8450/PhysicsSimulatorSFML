@@ -10,11 +10,13 @@ protected:
     float gravity; // float to not be too strong
     double mass;//be as fat as you want brotha
     double fps;//my worst enemy
+    int linked;
 
 public:
     BaseShape(sf::Color color, float gravity, double mass)
         : color(color), gravity(gravity), mass(mass)
     {
+        linked = -1;
         acceleration = sf::Vector2f(0, gravity ); //(x axis, y axis)
     }
 
@@ -71,6 +73,10 @@ public:
     sf::Vector2f GetAcceleration() {
         return acceleration;
     }
+
+    void SetLinked(bool isLinked) { linked = isLinked; }
+
+    int GetLinked() { return linked; }
 
 };
 
