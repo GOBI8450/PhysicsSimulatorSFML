@@ -18,7 +18,7 @@ struct {
     int window_height = desktopSize.height;
     int window_width = desktopSize.width;
     bool fullscreen = false;
-    float gravity = 0;
+    float gravity = 9.8;
     double massLock = 0;
 } options;
 
@@ -130,10 +130,22 @@ int main()
     const float ZOOM_FACTOR = 1.1f;
     unsigned int window_height = options.window_height;
     unsigned int window_width = options.window_width;
-    sf::RenderWindow window(sf::VideoMode(window_width, window_height), "TomySim", sf::Style::Fullscreen, settings);
+    sf::RenderWindow window(sf::VideoMode(window_width, window_height), "TomySim", sf::Style::Default, settings);
     view = window.getDefaultView();
+    sf::Cursor handCursor;
+    sf::Cursor defaultCursor;
+    if (!defaultCursor.loadFromSystem(sf::Cursor::Arrow)) {
+        return -1; // Error loading default cursor
+    }
+
+    // Load the wait cursor from the system
+    if (!handCursor.loadFromSystem(sf::Cursor::Hand)) {
+        return -1; // Error loading hand cursor
+    }
+    window.setMouseCursor(defaultCursor);
     float gridSize = 20;
-    ObjectsList objectList = ObjectsList();
+    float lineLength = 0;
+    ObjectsList objectList = ObjectsList(lineLength);
     window.setFramerateLimit(60);
     sf::Clock clock;
     sf::Clock fpsClock;
@@ -195,7 +207,7 @@ int main()
     bool mouseFlagScrollDown = false;
     int mouseScrollPower = 5;
     BaseShape* thisBallPointer = nullptr;
-    float moveSpeedScreen = 100.f;
+    float moveSpeedScreen = 15.f;
 
 
     std::string screen = "START";
@@ -248,14 +260,11 @@ int main()
     settingsButtonVec.push_back(std::make_pair(fullscreenButton, false));
     settingsButtonVec.push_back(std::make_pair(exitButtonSettings, false));
 
+    //PLANET::::!!!!
     //float innerGravity, sf::Color color, sf::Vector2f pos, float radius, float mass
-    objectList.CreateNewPlanet(7000, ball_color, sf::Vector2f(1980/2, 600), 20, 5.9722 * pow(10,24));
-    objectList.CreateNewPlanet(7000, ball_color, sf::Vector2f(1980/2-300, 600), 20, 5.9722 * pow(10,24));
-    sf::Vector2f initialVel = sf::Vector2f(4,0);
-
-    //Config Ball line link
-    //int disLine = 30;
-    //LineLink lineLink=LineLink(disLine);
+    //objectList.CreateNewPlanet(7000, ball_color, sf::Vector2f(1980/2, 600), 20, 5.9722 * pow(10,24));
+    //objectList.CreateNewPlanet(7000, ball_color, sf::Vector2f(1980/2-300, 600), 20, 5.9722 * pow(10,24));
+    sf::Vector2f initialVel = sf::Vector2f(0,0);
 
     //for starting with balls:
     /*for (size_t i = 0; i < 15; i++)
@@ -263,7 +272,7 @@ int main()
         objectList.CreateNewCircle(gravity, gradient[gradientStep], spawnStartingPoint);
     }*/
 
-
+    objectList.CreateNewCircle(gravity, gradient[gradientStep], spawnStartingPoint, initialVel);
 
     while (window.isOpen())
     {
@@ -306,6 +315,7 @@ int main()
                             {
                                 startingPointAdder *= -1;
                             }
+                            //objectList.connectObjects(objectList.ballsList.back(), objectList.ballsList[0]);
                         }
                         //Linking shit@#$@@#$@#@##$$@#
                         //lineLink.NewBall(ballsList.ballsList[ballsList.ballsList.size()-1]);
@@ -375,6 +385,7 @@ int main()
                 if (event.type == sf::Event::MouseButtonReleased) {
                     mouseFlagClick = false;
                     scaleFlag = false;
+                    window.setMouseCursor(defaultCursor);
                 }
                 if (event.type == sf::Event::MouseWheelScrolled) {
                     if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel) {
@@ -396,6 +407,7 @@ int main()
 
                 if (thisBallPointer != nullptr) { // Check if a circle was found
                     mouseFlagClick = true; // Set flag if circle found
+                    window.setMouseCursor(handCursor);
                 }
             }
 
@@ -432,7 +444,6 @@ int main()
                 }
             }
 
-            // Calculate the mouse movement (speed)
 
             // Calculate FPS
             frameCount++;
