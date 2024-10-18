@@ -18,7 +18,7 @@ struct {
     int window_height = desktopSize.height;
     int window_width = desktopSize.width;
     bool fullscreen = false;
-    float gravity = 9.8;
+    float gravity =9.8;
     double massLock = 0;
 } options;
 
@@ -144,7 +144,7 @@ int main()
     }
     window.setMouseCursor(defaultCursor);
     float gridSize = 20;
-    float lineLength = 0;
+    float lineLength = 150;
     ObjectsList objectList = ObjectsList(lineLength);
     window.setFramerateLimit(60);
     sf::Clock clock;
@@ -200,13 +200,13 @@ int main()
     short int startingPointAdder = 31;
     sf::Vector2f spawnStartingPoint = sf::Vector2f(posXStartingPoint, posYStartingPoint);
 
-    sf::Vector2i previousMousePos = sf::Mouse::getPosition(window);
     sf::Vector2i mousePos;
     bool mouseFlagClick = false;
     bool mouseFlagScrollUp = false;
     bool mouseFlagScrollDown = false;
     int mouseScrollPower = 5;
     BaseShape* thisBallPointer = nullptr;
+    BaseShape* previousBallPointer = nullptr;
     float moveSpeedScreen = 15.f;
 
 
@@ -261,10 +261,11 @@ int main()
     settingsButtonVec.push_back(std::make_pair(exitButtonSettings, false));
 
     //PLANET::::!!!!
+    bool planetMode = false;
+    sf::Vector2f initialVel = sf::Vector2f(4, 0);
     //float innerGravity, sf::Color color, sf::Vector2f pos, float radius, float mass
-    //objectList.CreateNewPlanet(7000, ball_color, sf::Vector2f(1980/2, 600), 20, 5.9722 * pow(10,24));
+    //objectList.CreateNewPlanet(7000, ball_color, sf::Vector2f(1980/2, 600), 20, 5.9722 * pow(10,1));
     //objectList.CreateNewPlanet(7000, ball_color, sf::Vector2f(1980/2-300, 600), 20, 5.9722 * pow(10,24));
-    sf::Vector2f initialVel = sf::Vector2f(0,0);
 
     //for starting with balls:
     /*for (size_t i = 0; i < 15; i++)
@@ -272,14 +273,17 @@ int main()
         objectList.CreateNewCircle(gravity, gradient[gradientStep], spawnStartingPoint);
     }*/
 
-    objectList.CreateNewCircle(gravity, gradient[gradientStep], spawnStartingPoint, initialVel);
+    //lineLink:
+    sf::Vector2f* previousMousePos=nullptr;
+    bool connectingMode = false;
+
 
     while (window.isOpen())
     {
         if (screen == "START")
         {
-            sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
-            sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePos);
+            sf::Vector2i currentMousePosInt = sf::Mouse::getPosition(window);
+            sf::Vector2f currentMousePos = static_cast<sf::Vector2f>(currentMousePosInt);
 
             sf::Event event;
             while (window.pollEvent(event))
@@ -303,7 +307,7 @@ int main()
                     if (event.key.code == sf::Keyboard::A) {
                         for (size_t i = 0; i < 10; i++)
                         {
-                            objectList.CreateNewCircle(gravity, gradient[gradientStep], spawnStartingPoint,initialVel);
+                            BaseShape* newObject=objectList.CreateNewCircle(gravity, gradient[gradientStep], spawnStartingPoint, initialVel);
                             objCount += 1;
                             gradientStep += 1;
                             spawnStartingPoint.x += startingPointAdder;
@@ -315,10 +319,8 @@ int main()
                             {
                                 startingPointAdder *= -1;
                             }
-                            //objectList.connectObjects(objectList.ballsList.back(), objectList.ballsList[0]);
+                            objectList.connectedObjects.AddObject(newObject);
                         }
-                        //Linking shit@#$@@#$@#@##$$@#
-                        //lineLink.NewBall(ballsList.ballsList[ballsList.ballsList.size()-1]);
                     }
                     if (event.key.code == sf::Keyboard::T) {
                         for (size_t i = 0; i < 10; i++)
@@ -337,38 +339,58 @@ int main()
                             }
                         }
                     }
-                    if (event.key.code == sf::Keyboard::Left)
-                        view.move(-moveSpeedScreen, 0.f);
-                    if (event.key.code == sf::Keyboard::Right)
-                        view.move(moveSpeedScreen, 0.f);
-                    if (event.key.code == sf::Keyboard::Up)
-                        view.move(0.f, -moveSpeedScreen);
-                    if (event.key.code == sf::Keyboard::Down)
-                        view.move(0.f, moveSpeedScreen);
+                    if (event.key.code == sf::Keyboard::C) {
+                        if (!connectingMode)
+                        {
+                            connectingMode = true;
+                            previousBallPointer = thisBallPointer;
+                        }
+                        else {
+                            connectingMode = false;
+                        }
+                    }
 
                     if (event.key.code == sf::Keyboard::H) {
-                        sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                        for (size_t i = 0; i < 3; i++)
+                        for (size_t i = 0; i < 1; i++)
                         {
-                            objectList.CreateNewCircle(gravity, gradient[gradientStep], mousePosFloat,initialVel);
+                            BaseShape* newObject = objectList.CreateNewCircle(gravity, gradient[gradientStep], currentMousePos, initialVel);
                             objCount += 1;
+                            objectList.connectedObjects.AddObject(newObject);
+                            objectList.connectedObjects.ConnectRandom(10);
                         }
+                    }
+                    if (event.key.code==sf::Keyboard::F11)
+                    {
+                        if (!options.fullscreen)
+                        {
+                            window.create(options.desktopSize, "Fullscreen Mode", sf::Style::Fullscreen);
+                            options.fullscreen = true;
+                        }
+                        else {
+                            window.create(sf::VideoMode(1920, 980), "Tomy Mode", sf::Style::Default);
+                            options.fullscreen = false;
+                        }
+                    }
+                    if (event.key.code == sf::Keyboard::L) {
+                        planetMode = true;
+                        objectList.CreateNewPlanet(7000, ball_color, currentMousePos, 20, 5.9722 * pow(10, 15));;
+                        objCount += 1;
                     }
                     if (event.key.code == sf::Keyboard::F) {
                         sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                        objectList.CreateNewCircle(gravity, explosion, sf::Vector2f(mousePosFloat.x + 3, mousePosFloat.y + 3), initialVel);
+                        objectList.CreateNewCircle(gravity, explosion, sf::Vector2f(currentMousePos.x + 3, currentMousePos.y + 3), initialVel);
                         for (size_t i = 0; i < 50; i++)
                         {
-                            objectList.CreateNewCircle(gravity, explosion, mousePosFloat, initialVel);
+                            objectList.CreateNewCircle(gravity, explosion, currentMousePos, initialVel);
                             objCount += 1;
                         }
                     }
                     if (event.key.code == sf::Keyboard::J) {
                         sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                        objectList.CreateNewRectangle(gravity, explosion, sf::Vector2f(mousePosFloat.x + 3, mousePosFloat.y + 3));
+                        objectList.CreateNewRectangle(gravity, explosion, sf::Vector2f(currentMousePos.x + 3, currentMousePos.y + 3));
                         for (size_t i = 0; i < 50; i++)
                         {
-                            objectList.CreateNewRectangle(gravity, explosion, mousePosFloat);
+                            objectList.CreateNewRectangle(gravity, explosion, currentMousePos);
                             objCount += 1;
                         }
                     }
@@ -381,6 +403,16 @@ int main()
                     {
                         scaleFlag = true;
                     }
+
+                    if (event.key.code == sf::Keyboard::Left)
+                        view.move(-moveSpeedScreen, 0.f);
+                    if (event.key.code == sf::Keyboard::Right)
+                        view.move(moveSpeedScreen, 0.f);
+                    if (event.key.code == sf::Keyboard::Up)
+                        view.move(0.f, -moveSpeedScreen);
+                    if (event.key.code == sf::Keyboard::Down)
+                        view.move(0.f, moveSpeedScreen);
+
                 }
                 if (event.type == sf::Event::MouseButtonReleased) {
                     mouseFlagClick = false;
@@ -403,8 +435,11 @@ int main()
             }
 
             if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && mouseFlagClick == false) {
-                thisBallPointer = objectList.IsInRadius(currentMousePos); // Check if a circle is within radius
-
+                thisBallPointer = objectList.IsInRadius(currentMousePosInt); // Check if a circle is within radius
+                if (previousBallPointer==nullptr)
+                {
+                    previousBallPointer = thisBallPointer;
+                }
                 if (thisBallPointer != nullptr) { // Check if a circle was found
                     mouseFlagClick = true; // Set flag if circle found
                     window.setMouseCursor(handCursor);
@@ -412,7 +447,7 @@ int main()
             }
 
             if (mouseFlagClick) { // Check if a circle is found
-                sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePos); // Use current mouse position
+                sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePosInt); // Use current mouse position
                 thisBallPointer->SetPosition(mousePosFloat); // Set position of the found ball
                 if (scaleFlag && mouseFlagScrollUp || mouseFlagScrollDown) {
                     if (Circle* circle = dynamic_cast<Circle*>(thisBallPointer)) {
@@ -442,6 +477,10 @@ int main()
                         }
                     }
                 }
+                else if (connectingMode&& thisBallPointer != previousBallPointer)
+                {
+                    objectList.connectedObjects.MakeNewLink(previousBallPointer, thisBallPointer);
+                }
             }
 
 
@@ -456,7 +495,7 @@ int main()
             window.clear(background_color);
             window.setView(view);
             //lineLink.MakeLinks(window,60);
-            objectList.MoveAndDraw(window, currentFPS, elastic);
+            objectList.MoveAndDraw(window, currentFPS, elastic,planetMode);
             window.setView(window.getDefaultView());
 
             // Update the FPS text
@@ -475,7 +514,6 @@ int main()
             window.display();
 
             // Update the previous mouse position
-            previousMousePos = currentMousePos;
 
             // Limit to 60 FPS
             sf::Time elapsed = clock.restart();
