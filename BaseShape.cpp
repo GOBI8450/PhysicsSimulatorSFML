@@ -21,7 +21,8 @@ public:
     }
 
     //Updates the position following varlet integration. meaning we calculate the next position based on the previos one and with time
-    virtual void updatePosition(float dt){}
+    virtual void updatePositionVerlet(float dt){}
+    virtual void updatePositionEuler(float dt) {}
 
     //If you wanna apply force to the circle:
     virtual void applyForce(sf::Vector2f force)
@@ -73,10 +74,18 @@ public:
     sf::Vector2f GetAcceleration() {
         return acceleration;
     }
+    // Getter for oldPosition
+    sf::Vector2f GetOldPosition() const {
+        return oldPosition;
+    }
+
+    // Setter for oldPosition
+    void SetOldPosition(const sf::Vector2f& newOldPosition) {
+        oldPosition = newOldPosition;
+    }
 
     void SetLinked(bool isLinked) { linked = isLinked; }
 
     int GetLinked() { return linked; }
-
 };
 
