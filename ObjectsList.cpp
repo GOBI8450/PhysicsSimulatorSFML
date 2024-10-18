@@ -2,6 +2,7 @@
 #include <random>
 #include "Grid.h"
 #include "CircleBase.h"
+#include "LineLink.h"
 #include "Rectangle.h"
 #include "Planet.h"
 #include <iostream>
@@ -17,11 +18,13 @@ private:
     std::mt19937 rnd;
     Grid grid;
     std::vector<Planet*> planetList;
+    float lineLength;
+    LineLink connectedObjects = LineLink(lineLength);
 
 public:
     std::vector<BaseShape*> ballsList;  // Changed to BaseShape* to store any shapes that derive from BaseShape
 
-    ObjectsList() { // Adjust cell size as needed
+    ObjectsList(float lineLength):lineLength(lineLength) { // Adjust cell size as needed
         rnd.seed(static_cast<unsigned>(std::time(nullptr)));
     }
 
@@ -38,7 +41,7 @@ public:
     }
 
     void CreateNewCircle(float gravity, sf::Color color, sf::Vector2f pos,  sf::Vector2f initialVel) {
-        std::uniform_int_distribution<int> radiusRange(3, 3);
+        std::uniform_int_distribution<int> radiusRange(5, 5);
         std::uniform_int_distribution<int> rndXRange(300, 500);  // Replace 920 with actual window width
         // std::uniform_int_distribution<int> rndYRange(50, 1280 - 50); // Replace 1280 with actual window height
 
@@ -54,9 +57,9 @@ public:
 
     void CreateNewPlanet(float innerGravity, sf::Color color, sf::Vector2f pos, float radius, float mass ) {
         float gravity = 0;
-        Planet* planet = new Planet(radius, color, pos, gravity, mass, innerGravity);        //^^^^^^float radius, sf::Color color, sf::Vector2f pos, float gravity, double mass, float innerGravity^^^^
-        Planet* planetCopy = new Planet(*planet);  // Correct way to create a copy        //^^^^^^float radius, sf::Color color, sf::Vector2f pos, float gravity, double mass, float innerGravity^^^^
-        ballsList.push_back(planetCopy); // Pushing back the BaseShape* into the vector
+        Planet* planet = new Planet(radius, color, pos, gravity, mass, innerGravity);   
+        //^^^^^^float radius, sf::Color color, sf::Vector2f pos, float gravity, double mass, float innerGravity^^^^
+        ballsList.push_back(planet); // Pushing back the BaseShape* into the vector
         planetList.push_back(planet); // Pushing back the BaseShape* into the vector
         ballCount += 1;
     }
@@ -76,6 +79,10 @@ public:
         ballCount += 1;
 
         // std::cout << "Creating ball at position: (" << position.x << ", " << position.y << ")\n";
+    }
+
+    void connectObjects(BaseShape* shape,BaseShape* target) {
+        connectedObjects.MakeNewLink(shape,target);
     }
 
     void HandleCollisionsInRange(sf::RenderWindow& window, float elastic, std::vector<std::vector<BaseShape*>> vecOfVecObj) {
@@ -260,9 +267,6 @@ public:
         return grid.IsInGridRadius(pointPos); // Return nullptr if no ball contains the point
     }
 
-    void handlePlanetGravity(sf::RenderWindow& window) {
-
-    }
 
     void MoveAndDraw(sf::RenderWindow& window, float fps, float elastic) {
         grid.clear(); // Clear the grid
@@ -275,7 +279,7 @@ public:
             fps = 60;
         }
         float deltaTime = 1 / fps; // Calculate deltaTime for movement
-        //HandleAllCollisions(window, elastic);
+        HandleAllCollisions(window, elastic);
         for (auto& planet : planetList)
         {
             for (auto& ball : ballsList) {
@@ -285,6 +289,7 @@ public:
                 }
             }
         }
+        connectedObjects.Draw(window);
         for (auto& ball : ballsList) {
             ball->updatePosition(deltaTime);
             ball->draw(window);
