@@ -2,13 +2,14 @@
 #include <SFML/Graphics.hpp>
 #include <iostream> 
 #include "BaseShape.h"
-#include "CircleBase.h"
+#include "Circle.h"
 
 class Rectangle: public BaseShape, public sf::RectangleShape
 {
 private:
 	float width;
 	float height;
+    sf::Vector2f velocity;
 
 public:
     // Constructor with radius, color, gravity, mass
@@ -35,14 +36,41 @@ public:
         acceleration = sf::Vector2f(0, gravity*100);//(x axis, y axis)
     }
 
-    //Updates the position following varlet integration. meaning we calculate the next position based on the previos one and with time
-    void updatePosition(float dt) override
+    void SetVelocity(const sf::Vector2f& newVelocity) override {
+        velocity = newVelocity;
+    }
+
+    void SetVelocity(float x, float y) override {
+        velocity.x = x;
+        velocity.y = y;
+    }
+
+    sf::Vector2f GetVelocity() const override {
+        return velocity;
+    }
+
+    // Modify the updatePosition method:
+    void updatePositionVerlet(float dt) override
     {
         sf::Vector2f currentPos = GetPosition();
-        sf::Vector2f velocity = currentPos - oldPosition;
-        oldPosition = currentPos;// updating the current position to the old one
-        sf::Vector2f newPos = currentPos + velocity + (acceleration * (dt * dt)); // Similar to what tomy teached -> x=x0+vt+1/2*a*t^2, yet here it is x=x0+v+a*t^2 thanks Tomy
+        sf::Vector2f newPos = currentPos + velocity * dt + (acceleration * (dt * dt * 0.5f));
+        oldPosition = currentPos;
         setPosition(newPos);
+
+        // Update velocity for the next frame
+        velocity = (newPos - currentPos) / dt;
+    }
+
+    //update the position based on euler integration.
+    void updatePositionEuler(float dt) override
+    {
+        sf::Vector2f currentPos = GetPosition();
+        sf::Vector2f newPos = currentPos + velocity * dt + (acceleration * (dt * dt * 0.5f));
+        oldPosition = currentPos;
+        setPosition(newPos);
+
+        // Update velocity for the next frame
+        velocity = (newPos - currentPos) / dt;
     }
 
     // Set shape color
@@ -196,7 +224,7 @@ public:
             sf::Vector2f posOther = otherRec->GetPosition();
 
             // Calculate the distance and overlap
-            double distance = DistanceOnly(otherRec);
+            double distance = Distance(otherRec);
             double overlap = FindOverlap(otherRec);
 
             if (overlap > 0) {
@@ -226,7 +254,7 @@ public:
             sf::Vector2f posOther = circle->GetPosition();
 
             // Calculate the distance and overlap
-            double distance = DistanceOnly(circle);
+            double distance = Distance(circle);
             double overlap = FindOverlap(circle);
 
             if (overlap > 0) {
