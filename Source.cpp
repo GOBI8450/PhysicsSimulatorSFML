@@ -1,3 +1,4 @@
+#pragma once
 #include <SFML/Graphics.hpp>;
 #include <SFML/Window.hpp>
 #include <sstream>
@@ -9,6 +10,7 @@
 #include "Rectangle.h"
 #include <random>  // For random number generation
 #include <ctime>   // For seeding with current time
+#include <boost/asio.hpp>
 
 
 bool hovering = false;
@@ -18,7 +20,7 @@ struct {
     int window_height = desktopSize.height;
     int window_width = desktopSize.width;
     bool fullscreen = false;
-    float gravity =9.8;
+    float gravity = 0;
     double massLock = 0;
 } options;
 
@@ -127,11 +129,12 @@ int main()
     sf::ContextSettings settings;
     settings.antialiasingLevel = 8;
     sf::View view;
-    const float ZOOM_FACTOR = 1.1f;
+    const float ZOOM_FACTOR = 1.5f;
     unsigned int window_height = options.window_height;
     unsigned int window_width = options.window_width;
     sf::RenderWindow window(sf::VideoMode(window_width, window_height), "TomySim", sf::Style::Default, settings);
     view = window.getDefaultView();
+    window.setVerticalSyncEnabled(true);
     sf::Cursor handCursor;
     sf::Cursor defaultCursor;
     if (!defaultCursor.loadFromSystem(sf::Cursor::Arrow)) {
@@ -154,19 +157,31 @@ int main()
     // Target frame time in seconds
     const float targetFrameTime = 1.0f / 60.0f; // 60 FPS
     // Text setup for displaying FPS
+
+        //lineLink:
+    sf::Vector2f* previousMousePos = nullptr;
+    bool connectingMode = false;
+
     sf::Font font;
     if (!font.loadFromFile("font.ttf")) { // Ensure you have a valid font file
         return -1;
     }
+    sf::Vector2f linkingTextPos = sf::Vector2f(0,50);
     sf::Text ballsCountText;
     sf::Text fpsText;
+    sf::Text linkingText;
     fpsText.setFont(font);
     fpsText.setCharacterSize(24);
     fpsText.setFillColor(sf::Color::White);
     ballsCountText.setFont(font);
     ballsCountText.setCharacterSize(24);
     ballsCountText.setFillColor(sf::Color::White);
-
+    linkingText.setFont(font);
+    linkingText.setCharacterSize(24);
+    linkingText.setFillColor(sf::Color::White);
+    linkingText.setPosition(linkingTextPos);
+    linkingText.setString("DEACTIVATED");
+    
 
     //Variables
     float deltaTime = 1 / 60;
@@ -185,6 +200,9 @@ int main()
     sf::Color explosion = sf::Color(205, 92, 8);
     sf::Color startColor = sf::Color(128, 0, 128);//purple
     sf::Color endColor = sf::Color(0, 0, 255);  //blue
+    sf::Color previousColor = sf::Color(0, 0, 0);
+    sf::Color outlineColor = sf::Color(255, 255, 255);
+    bool TouchedOnce = false;
     short int gradientStep = 0;
     short int gradientStepMax = 400;
     std::vector<sf::Color> gradient = GenerateGradient(startColor, endColor, gradientStepMax);
@@ -272,25 +290,22 @@ int main()
     {
         objectList.CreateNewCircle(gravity, gradient[gradientStep], spawnStartingPoint);
     }*/
-
-    //lineLink:
-    sf::Vector2f* previousMousePos=nullptr;
-    bool connectingMode = false;
-
+    Circle* copyObjCir= new Circle(ball_color2, 0, 0,4);
+    RectangleClass* copyObjRec= new RectangleClass(3,3,ball_color2, 0, 0);
 
     while (window.isOpen())
     {
         if (screen == "START")
         {
             sf::Vector2i currentMousePosInt = sf::Mouse::getPosition(window);
-            sf::Vector2f currentMousePos = static_cast<sf::Vector2f>(currentMousePosInt);
+            sf::Vector2f currentMousePos = window.mapPixelToCoords(currentMousePosInt, view);
 
             sf::Event event;
             while (window.pollEvent(event))
             {
                 if (event.type == sf::Event::Closed) { window.close(); }
                 if (event.type == sf::Event::MouseWheelScrolled) {
-                    if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel) {
+                    if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel && !scaleFlag) {
                         if (event.mouseWheelScroll.delta > 0)
                             view.zoom(1.f / ZOOM_FACTOR);
                         else if (event.mouseWheelScroll.delta < 0)
@@ -344,10 +359,17 @@ int main()
                         {
                             connectingMode = true;
                             previousBallPointer = thisBallPointer;
+                            linkingText.setString("ACTIVATED");
+                            linkingText.setFillColor(sf::Color::Magenta);
                         }
                         else {
                             connectingMode = false;
+                            linkingText.setString("DEACTIVATED");
+                            linkingText.setFillColor(sf::Color::White);
                         }
+                    }
+                    if (event.key.code == sf::Keyboard::BackSpace && mouseFlagClick) {
+                        objectList.DeleteThisObj(thisBallPointer);
                     }
 
                     if (event.key.code == sf::Keyboard::H) {
@@ -399,7 +421,7 @@ int main()
                         objCount = 0;
                     }
 
-                    if (mouseFlagClick && event.key.code == sf::Keyboard::S)
+                    if (event.key.code == sf::Keyboard::S && mouseFlagClick)
                     {
                         scaleFlag = true;
                     }
@@ -417,25 +439,40 @@ int main()
                 if (event.type == sf::Event::MouseButtonReleased) {
                     mouseFlagClick = false;
                     scaleFlag = false;
-                    window.setMouseCursor(defaultCursor);
+                    if (thisBallPointer!=nullptr)
+                    {
+                        window.setMouseCursor(defaultCursor);
+                        thisBallPointer->setColor(previousColor);
+                        thisBallPointer->SetOutline(outlineColor, 0);
+                    }
+                    TouchedOnce = false;
                 }
                 if (event.type == sf::Event::MouseWheelScrolled) {
-                    if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel) {
+                    if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel && !scaleFlag) {
+                        //sf::Vector2f beforeZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
+
                         if (event.mouseWheelScroll.delta > 0) {
+
+
+                            view.zoom(1.f / ZOOM_FACTOR);
                             mouseFlagScrollUp = true;
                         }
-                        else
-                        {
+
+                        else if (event.mouseWheelScroll.delta < 0) {
+                            view.zoom(ZOOM_FACTOR);
                             mouseFlagScrollDown = true;
                         }
 
+                        //sf::Vector2f afterZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
+                        //sf::Vector2f offset = beforeZoom - afterZoom;
+                        //view.move(offset);
                     }
                 }
 
             }
 
             if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && mouseFlagClick == false) {
-                thisBallPointer = objectList.IsInRadius(currentMousePosInt); // Check if a circle is within radius
+                thisBallPointer = objectList.IsInRadius(currentMousePos); // Check if a circle is within radius
                 if (previousBallPointer==nullptr)
                 {
                     previousBallPointer = thisBallPointer;
@@ -447,8 +484,23 @@ int main()
             }
 
             if (mouseFlagClick) { // Check if a circle is found
-                sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePosInt); // Use current mouse position
-                thisBallPointer->SetPosition(mousePosFloat); // Set position of the found ball
+                thisBallPointer->SetPosition(currentMousePos); // Set position of the found ball
+
+                if (!TouchedOnce)
+                {
+                    thisBallPointer->SetOutline(outlineColor,5);
+                    // Get the current color
+                    sf::Color currentColor = thisBallPointer->GetColor();
+                    previousColor = currentColor;
+                    // Darken the color by reducing the RGB values (without going below 0)
+                    currentColor.r = std::max(0, currentColor.r - 15);
+                    currentColor.g = std::max(0, currentColor.g - 15);
+                    currentColor.b = std::max(0, currentColor.b - 15);
+
+                    // Apply the new color to the rectangle
+                    thisBallPointer->setColor(currentColor);
+                    TouchedOnce = true;
+                }
                 if (scaleFlag && mouseFlagScrollUp || mouseFlagScrollDown) {
                     if (Circle* circle = dynamic_cast<Circle*>(thisBallPointer)) {
                         if (mouseFlagScrollDown && circle->getRadius() > 0.0001) {
@@ -463,7 +515,7 @@ int main()
                             mouseFlagScrollUp = false;
                         }
                     }
-                    else if (Rectangle* rectangle = dynamic_cast<Rectangle*>(thisBallPointer))
+                    else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(thisBallPointer))
                     {
                         if (mouseFlagScrollDown && rectangle->GetHeight() > 0.0001 && rectangle->GetWidth() > 0.0001) {
                             rectangle->SetSizeAndOrigin(rectangle->GetWidth() - mouseScrollPower, rectangle->GetHeight() - mouseScrollPower);
@@ -495,6 +547,10 @@ int main()
             window.clear(background_color);
             window.setView(view);
             //lineLink.MakeLinks(window,60);
+
+            copyObjCir->draw(window);
+
+
             objectList.MoveAndDraw(window, currentFPS, elastic,planetMode);
             window.setView(window.getDefaultView());
 
@@ -505,6 +561,7 @@ int main()
             oss << "Balls Count: " << static_cast<int>(objCount);
             fpsText.setString(oss.str());
             window.draw(fpsText);
+            window.draw(linkingText);
             ballsCountText.setString(ossCount.str());
             window.draw(ballsCountText);
 
