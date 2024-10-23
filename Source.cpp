@@ -127,7 +127,6 @@ public:
     std::string Run() {
         currentMousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window), view);
         handleSimulationEvents();
-        updateSimulation();
         renderSimulation();
         return screen;
     }
@@ -162,19 +161,15 @@ private:
 
 
 
-    void updateSimulation() {
-        updateFPS();
-        objectList.MoveAndDraw(window, currentFPS, elastic, planetMode);
-    }
-
     void renderSimulation() {
+        updateFPS();
         window.clear(background_color);
         window.setView(view);
 
         objectList.MoveAndDraw(window, currentFPS, elastic, planetMode);
 
         window.setView(window.getDefaultView());
-        renderUI();
+        renderTexts();
 
         window.display();
 
@@ -197,29 +192,7 @@ private:
         }
         return gradient;
     }
-    void scaleCircle(Circle* circle) {
-        float currentRadius = circle->GetRadius();
-        if (mouseFlagScrollUp && currentRadius < 100.0f) {
-            circle->SetRadius(currentRadius + mouseScrollPower);
-            mouseFlagScrollUp = false;
-        }
-        else if (mouseFlagScrollDown && currentRadius > 10.0f) {
-            circle->SetRadius(currentRadius - mouseScrollPower);
-            mouseFlagScrollDown = false;
-        }
-    }
 
-    void scaleRectangle(RectangleClass* rectangle) {
-        sf::Vector2f currentSize = rectangle->getSize();
-        if (mouseFlagScrollUp && currentSize.x < 100.0f) {
-            rectangle->setSize(currentSize + sf::Vector2f(mouseScrollPower, mouseScrollPower));
-            mouseFlagScrollUp = false;
-        }
-        else if (mouseFlagScrollDown && currentSize.x > 10.0f) {
-            rectangle->setSize(currentSize - sf::Vector2f(mouseScrollPower, mouseScrollPower));
-            mouseFlagScrollDown = false;
-        }
-    }
 
     void loadTextures() {
         // Since no textures are used in the original code, this method is kept minimal
@@ -272,7 +245,6 @@ private:
         linkingText.setPosition(10, 70);
     }
 
-
     void setupHeaders() {
         headerText.setSize(sf::Vector2f(400.f, 100.f));
         headerText.setPosition(
@@ -282,19 +254,42 @@ private:
         headerText.setFillColor(buttonColor);
     }
 
+    void renderTexts() {
+        std::ostringstream fpsStream;
+        std::ostringstream ballCountStream;
+
+        fpsStream << "FPS: " << static_cast<int>(currentFPS);
+        ballCountStream << "Balls Count: " << static_cast<int>(objCount);
+
+        fpsText.setString(fpsStream.str());
+        ballsCountText.setString(ballCountStream.str());
+
+        window.draw(fpsText);
+        window.draw(linkingText);
+        window.draw(ballsCountText);
+    }
+
+    void limitFrameRate() {
+        sf::Time elapsed = clock.restart();
+        if (elapsed.asSeconds() < deltaTime) {
+            sf::sleep(sf::seconds(deltaTime - elapsed.asSeconds()));
+        }
+    }
+
     void handleEvent(sf::Event event) {
         if (event.type == sf::Event::Closed) { window.close(); }
         handleKeyPress(event);
-        //handleMouseWheel(event.mouseWheelScroll);
+        handleMouseRelase(event);
+        handleMouseWheel(event);
     }
-
 
     void handleSimulationEvents() {
         sf::Event event;
         while (window.pollEvent(event)) {
             handleEvent(event);
         }
-        handleMouseClick(event);
+        handleMouseClick();
+        handleScaling();
         handleMouseInteraction();
     }
 
@@ -420,7 +415,21 @@ private:
         }
     }
 
-    void handleMouseClick(sf::Event event) {
+    void handleMouseClick() { 
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && mouseClickFlag == false) {
+            thisBallPointer = objectList.IsInRadius(currentMousePos); // Check if a circle is within radius
+            if (previousBallPointer == nullptr)
+            {
+                previousBallPointer = thisBallPointer;
+            }
+            if (thisBallPointer != nullptr) { // Check if a circle was found
+                mouseClickFlag = true; // Set flag if circle found
+                window.setMouseCursor(handCursor);
+            }
+        }
+    }
+
+    void handleMouseRelase(sf::Event event) {
         if (event.type == sf::Event::MouseButtonReleased) {
             mouseClickFlag = false;
             scaleFlag = false;
@@ -431,17 +440,6 @@ private:
                 thisBallPointer->SetOutline(outlineColor, 0);
             }
             TouchedOnce = false;
-        }
-        else if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && mouseClickFlag == false) {
-            thisBallPointer = objectList.IsInRadius(currentMousePos); // Check if a circle is within radius
-            if (previousBallPointer == nullptr)
-            {
-                previousBallPointer = thisBallPointer;
-            }
-            if (thisBallPointer != nullptr) { // Check if a circle was found
-                mouseClickFlag = true; // Set flag if circle found
-                window.setMouseCursor(handCursor);
-            }
         }
     }
 
@@ -463,82 +461,37 @@ private:
                 thisBallPointer->setColor(currentColor);
                 TouchedOnce = true;
             }
-            if (scaleFlag && mouseFlagScrollUp || mouseFlagScrollDown) {
-                if (Circle* circle = dynamic_cast<Circle*>(thisBallPointer)) {
-                    if (mouseFlagScrollDown && circle->getRadius() > 0.0001) {
-                        circle->SetRadiusAndCenter(circle->getRadius() - mouseScrollPower);
-                        circle->SetMass(circle->GetMass() - mouseScrollPower * 10);
-                        std::cout << circle->getRadius();
-                        mouseFlagScrollDown = false;
-                    }
-                    else {
-                        circle->SetRadiusAndCenter(circle->getRadius() + mouseScrollPower);
-                        circle->SetMass(circle->GetMass() + mouseScrollPower * 10);
-                        mouseFlagScrollUp = false;
-                    }
-                }
-                else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(thisBallPointer))
-                {
-                    if (mouseFlagScrollDown && rectangle->GetHeight() > 0.0001 && rectangle->GetWidth() > 0.0001) {
-                        rectangle->SetSizeAndOrigin(rectangle->GetWidth() - mouseScrollPower, rectangle->GetHeight() - mouseScrollPower);
-                        rectangle->SetMass(rectangle->GetMass() - mouseScrollPower * 10);
-                        mouseFlagScrollDown = false;
-                    }
-                    else {
-                        rectangle->SetSizeAndOrigin(rectangle->GetWidth() + mouseScrollPower, rectangle->GetHeight() + mouseScrollPower);
-                        rectangle->SetMass(rectangle->GetMass() + mouseScrollPower * 10);
-                        mouseFlagScrollUp = false;
-                    }
-                }
-            }
             else if (connectingMode && thisBallPointer != previousBallPointer)
             {
                 objectList.connectedObjects.MakeNewLink(previousBallPointer, thisBallPointer);
             }
+            handleScaling();
         }
     }
 
-    void handleMouseWheel(sf::Event::MouseWheelScrollEvent event) {
-        if (event.wheel == sf::Mouse::VerticalWheel && !scaleFlag) {
-            //sf::Vector2f beforeZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
+    void handleMouseWheel(sf::Event event) {
+        if (event.type == sf::Event::MouseWheelScrolled) {
+            if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel) {
+                //sf::Vector2f beforeZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
+                if (event.mouseWheelScroll.delta > 0) {
 
-            if (event.delta > 0) {
+                    if (!scaleFlag) {
+                        view.zoom(1.f / ZOOM_FACTOR);
+                    }
+                    mouseFlagScrollUp = true;
+                }
 
+                else if (event.mouseWheelScroll.delta < 0) {
+                    if (!scaleFlag) {
+                        view.zoom(ZOOM_FACTOR);
+                    }
+                    mouseFlagScrollDown = true;
+                }
 
-                view.zoom(1.f / ZOOM_FACTOR);
-                mouseFlagScrollUp = true;
+                //sf::Vector2f afterZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
+                //sf::Vector2f offset = beforeZoom - afterZoom;
+                //view.move(offset);
             }
-
-            else if (event.delta < 0) {
-                view.zoom(ZOOM_FACTOR);
-                mouseFlagScrollDown = true;
-            }
-
-            //sf::Vector2f afterZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
-            //sf::Vector2f offset = beforeZoom - afterZoom;
-            //view.move(offset);
-        }
-    }
-
-    void renderUI() {
-        std::ostringstream fpsStream;
-        std::ostringstream ballCountStream;
-
-        fpsStream << "FPS: " << static_cast<int>(currentFPS);
-        ballCountStream << "Balls Count: " << static_cast<int>(objCount);
-
-        fpsText.setString(fpsStream.str());
-        ballsCountText.setString(ballCountStream.str());
-
-        window.draw(fpsText);
-        window.draw(linkingText);
-        window.draw(ballsCountText);
-    }
-
-    void limitFrameRate() {
-        sf::Time elapsed = clock.restart();
-        if (elapsed.asSeconds() < deltaTime) {
-            sf::sleep(sf::seconds(deltaTime - elapsed.asSeconds()));
         }
     }
 
@@ -565,13 +518,41 @@ private:
     }
 
     void handleScaling() {
-        if (scaleFlag && (mouseFlagScrollUp || mouseFlagScrollDown)) {
+        if (scaleFlag && mouseFlagScrollUp || mouseFlagScrollDown) {
             if (Circle* circle = dynamic_cast<Circle*>(thisBallPointer)) {
                 scaleCircle(circle);
             }
-            else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(thisBallPointer)) {
+            else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(thisBallPointer))
+            {
                 scaleRectangle(rectangle);
             }
+        }
+    }
+
+    void scaleCircle(Circle* circle) {
+        if (mouseFlagScrollDown && circle->getRadius() > 0.0001) {
+            circle->SetRadiusAndCenter(circle->getRadius() - mouseScrollPower);
+            circle->SetMass(circle->GetMass() - mouseScrollPower * 10);
+            std::cout << circle->getRadius();
+            mouseFlagScrollDown = false;
+        }
+        else {
+            circle->SetRadiusAndCenter(circle->getRadius() + mouseScrollPower);
+            circle->SetMass(circle->GetMass() + mouseScrollPower * 10);
+            mouseFlagScrollUp = false;
+        }
+    }
+
+    void scaleRectangle(RectangleClass* rectangle) {
+        if (mouseFlagScrollDown && rectangle->GetHeight() > 0.0001 && rectangle->GetWidth() > 0.0001) {
+            rectangle->SetSizeAndOrigin(rectangle->GetWidth() - mouseScrollPower, rectangle->GetHeight() - mouseScrollPower);
+            rectangle->SetMass(rectangle->GetMass() - mouseScrollPower * 10);
+            mouseFlagScrollDown = false;
+        }
+        else {
+            rectangle->SetSizeAndOrigin(rectangle->GetWidth() + mouseScrollPower, rectangle->GetHeight() + mouseScrollPower);
+            rectangle->SetMass(rectangle->GetMass() + mouseScrollPower * 10);
+            mouseFlagScrollUp = false;
         }
     }
 
@@ -602,97 +583,99 @@ class MainMenu
 {
 private:
     sf::RenderWindow& window;
-    sf::Color settingsBackgroundColor = sf::Color(25, 25, 25);
+    sf::Color mainMenuBackgroundColor = sf::Color(25, 25, 25);
     std::vector<std::pair<Button, bool>> mainMenuButtonVec;
     sf::RectangleShape headerText;
     bool hovering = false;
     bool mouseClickFlag = false;
     sf::Vector2f currentMousePos;
-    float textureResizer = 1.2;
+    float textureResizer = 1.8;
     float headerTextureResizer = 1.2;
+
+    // Textures
+    sf::Texture startButtonTexture;
+    sf::Texture exitButtonTexture;
+    sf::Texture settingsButtonTexture;
+    sf::Texture mainMenuHeaderTexture;
 
 
 public:
-    MainMenu(sf::RenderWindow& window):window(window) { setupButtons(); };
+    MainMenu(sf::RenderWindow& window):window(window) { 
+        if (!loadTextures()) {
+            throw std::runtime_error("Failed to load textures");
+        }
+        setupButtons(); 
+    };
 
-    void setupButtons() {
-        sf::RectangleShape headerText = sf::RectangleShape(sf::Vector2f(1212 / headerTextureResizer, 80 / headerTextureResizer));
-        headerText.setOrigin(headerText.getSize().x / 2, headerText.getSize().y / 2);
-        headerText.setPosition(options.window_width / 2, options.window_height / 2 - 350);
-        sf::Texture startButtonTexture;
-        sf::Texture exitButtonTexture;
-        sf::Texture settingsButtonTexture;
-        sf::Texture mainMenuHeaderTexture;
-        if (!startButtonTexture.loadFromFile("START.png")) { throw std::runtime_error("Failed to load textures"); }
-        if (!exitButtonTexture.loadFromFile("EXIT.png")) { throw std::runtime_error("Failed to load textures"); }
-        if (!settingsButtonTexture.loadFromFile("SETTINGS.png")) { throw std::runtime_error("Failed to load textures"); }
-        if (!mainMenuHeaderTexture.loadFromFile("Header.png")) { throw std::runtime_error("Failed to load textures"); }
+    bool loadTextures() {
+        if (!startButtonTexture.loadFromFile("START.png")) return false;
+        if (!exitButtonTexture.loadFromFile("EXIT.png")) return false;
+        if (!settingsButtonTexture.loadFromFile("SETTINGS.png")) return false;
+        if (!mainMenuHeaderTexture.loadFromFile("Header.png")) return false;
+
         startButtonTexture.setSmooth(true);
         exitButtonTexture.setSmooth(true);
         settingsButtonTexture.setSmooth(true);
         mainMenuHeaderTexture.setSmooth(true);
-        Button startButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 450), "START");
-        Button settingsButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 675), "SETTINGS");
-        Button exitButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 925), "EXIT");
+
+        return true;
+    }
+
+    void setupButtons() {
+        headerText = sf::RectangleShape(sf::Vector2f(1212 / headerTextureResizer, 80 / headerTextureResizer));
+        headerText.setOrigin(headerText.getSize().x / 2, headerText.getSize().y / 2);
+        headerText.setPosition(options.window_width / 2, options.window_height / 2 - 350);
+        headerText.setTexture(&mainMenuHeaderTexture);
+
+        Button startButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer,
+            sf::Vector2f(options.window_width / 2, 450), "START");
+        Button settingsButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer,
+            sf::Vector2f(options.window_width / 2, 675), "SETTINGS");
+        Button exitButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer,
+            sf::Vector2f(options.window_width / 2, 925), "EXIT");
+
         startButtonMainMenu.SetTexture(startButtonTexture);
         settingsButtonMainMenu.SetTexture(settingsButtonTexture);
         exitButtonMainMenu.SetTexture(exitButtonTexture);
-        headerText.setTexture(&mainMenuHeaderTexture);
+
         mainMenuButtonVec.push_back(std::make_pair(startButtonMainMenu, false));
         mainMenuButtonVec.push_back(std::make_pair(settingsButtonMainMenu, false));
         mainMenuButtonVec.push_back(std::make_pair(exitButtonMainMenu, false));
-
-        //settings
-        //sf::RectangleShape settingsHeaderText = sf::RectangleShape(sf::Vector2f(555 / headerTextureResizer, 79 / headerTextureResizer));
-        //settingsHeaderText.setOrigin(settingsHeaderText.getSize().x / 2, settingsHeaderText.getSize().y / 2);
-        //settingsHeaderText.setPosition(options.window_width / 2, options.window_height / 2 - 350);
-        //sf::Texture SettingsHeaderTexture;
-        //sf::Texture fullscreenButtonTexture;
-        //if (!fullscreenButtonTexture.loadFromFile("FULLSCREEN.png")) { throw std::runtime_error("Failed to load textures"); }
-        //if (!SettingsHeaderTexture.loadFromFile("SETTINGS_HEADER.png")) { throw std::runtime_error("Failed to load textures"); }
-        //fullscreenButtonTexture.setSmooth(true);;
-        //SettingsHeaderTexture.setSmooth(true);;
-        //Button fullscreenButton = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 350), "FULLSCREEN");
-        //Button exitButtonSettings = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 550), "MAIN MENU");
-        //fullscreenButton.SetTexture(fullscreenButtonTexture);
-        //settingsHeaderText.setTexture(&SettingsHeaderTexture);
-        //exitButtonSettings.SetTexture(exitButtonTexture);
-        //settingsButtonVec.push_back(std::make_pair(fullscreenButton, false));
-        //settingsButtonVec.push_back(std::make_pair(exitButtonSettings, false));
     }
 
 
     std::string handleMainMenu() {
         window.setTitle("Main Menu");
-        currentMousePos = static_cast<sf::Vector2f>(sf::Mouse::getPosition(window));
-        mouseClickFlag = false;
 
+        sf::Vector2u windowSize = window.getSize();
+        sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
+        sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePos);
+        bool mouseClickFlag = false;
         sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
-            }
-            if (event.type == sf::Event::MouseButtonReleased) {
-                mouseClickFlag = true;
-            }
+        while (window.pollEvent(event))
+        {
+            if (event.type == sf::Event::Closed) { window.close(); }
+            if (event.type == sf::Event::MouseButtonReleased) { mouseClickFlag = true; }
         }
-
-        window.clear(settingsBackgroundColor);
-
-        if (mouseClickFlag) {
-            for (auto& pair : mainMenuButtonVec) {
-                if (pair.first.IsInRadius(currentMousePos)) {
+        window.clear(mainMenuBackgroundColor);
+        if (mouseClickFlag)
+        {
+            for (auto& pair : mainMenuButtonVec)
+            {
+                if (pair.first.IsInRadius(mousePosFloat))
+                {
                     return pair.first.GetName();
                 }
             }
         }
-
-        for (auto& button : mainMenuButtonVec) {
-            button.second = button.first.MouseHover(currentMousePos, hovering);
+        for (auto& button : mainMenuButtonVec)
+        {
+            button.second = button.first.MouseHover(mousePosFloat, hovering);
         }
-
         window.draw(headerText);
-        for (auto& button : mainMenuButtonVec) {
+        for (auto& button : mainMenuButtonVec)
+        {
+
             button.first.draw(window);
         }
 
@@ -710,51 +693,54 @@ private:
     sf::RectangleShape headerText;
     bool hovering = false;
     bool mouseClickFlag = false;
-    sf::Vector2f currentMousePos;
-    float textureResizer = 1.2;
+    float textureResizer = 1.8;
     float headerTextureResizer = 1.2;
 
+    sf::Texture fullscreenButtonTexture;
+    sf::Texture exitButtonTexture;
+    sf::Texture settingsHeaderTexture;
 
 public:
-    Settings(sf::RenderWindow& window) :window(window) {
+    Settings(sf::RenderWindow& window) : window(window) {
+        if (!loadTextures()) {
+            throw std::runtime_error("Failed to load textures");
+        }
         setupButtons();
-    };
+    }
+
+    bool loadTextures() {
+        if (!fullscreenButtonTexture.loadFromFile("FULLSCREEN.png")) { return false; }
+        if (!settingsHeaderTexture.loadFromFile("SETTINGS_HEADER.png")) { return false; }
+        if (!exitButtonTexture.loadFromFile("EXIT.png")) { return false; }
+
+        exitButtonTexture.setSmooth(true);
+        settingsHeaderTexture.setSmooth(true);
+        fullscreenButtonTexture.setSmooth(true);
+
+        return true;
+    }
 
     void setupButtons() {
-        sf::RectangleShape headerText = sf::RectangleShape(sf::Vector2f(1212 / headerTextureResizer, 80 / headerTextureResizer));
+        headerText = sf::RectangleShape(sf::Vector2f(555 / headerTextureResizer, 79 / headerTextureResizer));
         headerText.setOrigin(headerText.getSize().x / 2, headerText.getSize().y / 2);
         headerText.setPosition(options.window_width / 2, options.window_height / 2 - 350);
-        sf::Texture startButtonTexture;
-        sf::Texture exitButtonTexture;
-        sf::Texture settingsButtonTexture;
-        sf::Texture mainMenuHeaderTexture;
-        if (!startButtonTexture.loadFromFile("START.png")) { throw std::runtime_error("Failed to load textures"); }
-        if (!exitButtonTexture.loadFromFile("EXIT.png")) { throw std::runtime_error("Failed to load textures"); }
-        if (!settingsButtonTexture.loadFromFile("SETTINGS.png")) { throw std::runtime_error("Failed to load textures"); }
-        if (!mainMenuHeaderTexture.loadFromFile("Header.png")) { throw std::runtime_error("Failed to load textures"); }
-        startButtonTexture.setSmooth(true);
-        exitButtonTexture.setSmooth(true);
-        settingsButtonTexture.setSmooth(true);
-        mainMenuHeaderTexture.setSmooth(true);
-        Button startButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 450), "START");
-        Button settingsButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 675), "SETTINGS");
-        Button exitButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 925), "EXIT");
-        startButtonMainMenu.SetTexture(startButtonTexture);
-        settingsButtonMainMenu.SetTexture(settingsButtonTexture);
-        exitButtonMainMenu.SetTexture(exitButtonTexture);
-        headerText.setTexture(&mainMenuHeaderTexture);
-        settingsButtonVec.push_back(std::make_pair(startButtonMainMenu, false));
-        settingsButtonVec.push_back(std::make_pair(settingsButtonMainMenu, false));
-        settingsButtonVec.push_back(std::make_pair(exitButtonMainMenu, false));
 
+        Button fullscreenButton = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 350), "FULLSCREEN");
+        Button exitButtonSettings = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 550), "MAIN MENU");
+        
+        fullscreenButton.SetTexture(fullscreenButtonTexture);
+        headerText.setTexture(&settingsHeaderTexture);
+        exitButtonSettings.SetTexture(exitButtonTexture);
 
+        settingsButtonVec.push_back(std::make_pair(fullscreenButton, false));
+        settingsButtonVec.push_back(std::make_pair(exitButtonSettings, false));
     }
 
     std::string handleSettings() {
         window.setTitle("Settings");
 
-        currentMousePos = static_cast<sf::Vector2f>(sf::Mouse::getPosition(window));
-        mouseClickFlag = false;
+        sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(sf::Mouse::getPosition(window));
+        bool mouseClickFlag = false;
 
         sf::Event event;
         while (window.pollEvent(event)) {
@@ -768,18 +754,24 @@ public:
 
         window.clear(settingsBackgroundColor);
 
+        // Reset hover state
+        hovering = false;
+
+        // Update hover states
+        for (auto& button : settingsButtonVec) {
+            button.second = button.first.MouseHover(mousePosFloat, hovering);
+        }
+
+        // Check for clicks
         if (mouseClickFlag) {
             for (auto& button : settingsButtonVec) {
-                if (button.first.IsInRadius(currentMousePos)) {
+                if (button.first.IsInRadius(mousePosFloat)) {
                     return button.first.GetName();
                 }
             }
         }
 
-        for (auto& button : settingsButtonVec) {
-            button.second = button.first.MouseHover(currentMousePos, hovering);
-        }
-
+        // Draw everything
         window.draw(headerText);
         for (auto& button : settingsButtonVec) {
             button.first.draw(window);
@@ -788,7 +780,6 @@ public:
         window.display();
         return "SETTINGS";
     }
-
 };
 
 void initializeWindow(sf::RenderWindow& window, sf::View view, sf::ContextSettings settings) {
@@ -828,7 +819,7 @@ void Run(std::string& screen, PhysicsSimulation& simulation, MainMenu& mainMenu,
         }
         else {
             window.close();
-            break;  // Add break to exit the loop when closing
+            break;  //  break to exit the loop when closing
         }
     }
 }
@@ -841,10 +832,10 @@ int main() {
         sf::View view = window.getDefaultView();
         initializeWindow(window, view, settings);
 
-        PhysicsSimulation simulation(window);  // Remove the '=' to avoid copy initialization
+        PhysicsSimulation simulation(window);  
         MainMenu mainMenu(window);
         Settings settingsClass(window);
-        std::string screen = "MAIN MENU";  // Changed from "MainMenu" to match your string comparisons
+        std::string screen = "MAIN MENU";  
 
         Run(screen, simulation, mainMenu, settingsClass, window);
 
