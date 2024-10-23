@@ -11,10 +11,21 @@
 #include "Button.h"
 #include "Rectangle.h"
 
+
+// Application states
+struct Options {
+    sf::VideoMode desktopSize = sf::VideoMode::getDesktopMode();
+    int window_height = desktopSize.height;
+    int window_width = desktopSize.width;
+    bool fullscreen = false;
+    float gravity = 9.8;
+    double massLock = 0;
+} options;
+
 class PhysicsSimulation {
 private:
     // Window and view settings
-    sf::RenderWindow window;
+    sf::RenderWindow& window;
     sf::View view;
     sf::ContextSettings settings;
     const float ZOOM_FACTOR = 1.5f;
@@ -22,16 +33,6 @@ private:
     // Cursors
     sf::Cursor handCursor;
     sf::Cursor defaultCursor;
-
-    // Application states
-    struct Options {
-        sf::VideoMode desktopSize = sf::VideoMode::getDesktopMode();
-        int window_height = desktopSize.height;
-        int window_width = desktopSize.width;
-        bool fullscreen = false;
-        float gravity = 0;
-        double massLock = 0;
-    } options;
 
     std::string screen = "START";
     bool hovering = false;
@@ -49,7 +50,8 @@ private:
 
     // Mouse and interaction state
     sf::Vector2f* previousMousePos = nullptr;
-    bool mouseFlagClick = false;
+    sf::Vector2f currentMousePos;
+    bool mouseClickFlag = false;
     bool mouseFlagScrollUp = false;
     bool mouseFlagScrollDown = false;
     int mouseScrollPower = 5;
@@ -59,13 +61,12 @@ private:
 
     // Object pointers for interaction
     BaseShape* thisBallPointer = nullptr;
-    BaseShape* previousBallPointer = nullptr;
+    BaseShape* previousBallPointer = nullptr;   
 
     // Visual settings
     sf::Color ball_color = sf::Color(238, 238, 238);
     sf::Color ball_color2 = sf::Color(50, 5, 11);
     sf::Color background_color = sf::Color(30, 30, 30);
-    sf::Color mainMenuBackgroundColor = sf::Color(25, 25, 25);
     sf::Color buttonColor = sf::Color(55, 58, 64);
     sf::Color bb = sf::Color(44, 55, 100);
     sf::Color explosion = sf::Color(205, 92, 8);
@@ -85,7 +86,6 @@ private:
 
     // Menu elements
     sf::RectangleShape headerText;
-    std::vector<std::pair<Button, bool>> mainMenuButtonVec;
     std::vector<std::pair<Button, bool>> settingsButtonVec;
 
     // Performance tracking
@@ -105,55 +105,34 @@ private:
     sf::Vector2f spawnStartingPoint;
     sf::Vector2f initialVel = sf::Vector2f(4, 0);
 
-    float textureResizer = 1.2;
+
 
 public:
-    PhysicsSimulation() :
-        settings(8),  // antialiasing level
+
+
+    PhysicsSimulation(sf::RenderWindow& win) :
+        window(win),
+        settings(8),
         objectList(lineLength),
-        spawnStartingPoint(posXStartingPoint, posYStartingPoint) {
-        initializeWindow();
+        spawnStartingPoint(posXStartingPoint, posYStartingPoint)
+    {
+        view = window.getDefaultView();  // Initialize view from window
         initializeCursors();
         loadResources();
         initializeUI();
         setupGradient();
-        createCopyObjects();
     }
 
-    void run() {
-        while (window.isOpen()) {
-            if (screen == "START") {
-                runSimulation();
-            }
-            else if (screen == "MAIN MENU") {
-                screen = handleMainMenu();
-            }
-            else if (screen == "SETTINGS") {
-                screen = handleSettings();
-            }
 
-            else if (screen == "FULLSCREEN") {
-                toggleFullscreen();
-                screen = handleSettings();
-            }
-            else { 
-                window.close();
-            }
-        }
+    std::string Run() {
+        currentMousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window), view);
+        handleSimulationEvents();
+        updateSimulation();
+        renderSimulation();
+        return screen;
     }
 
 private:
-    void initializeWindow() {
-        window.create(
-            sf::VideoMode(options.window_width, options.window_height),
-            "TomySim",
-            sf::Style::Default,
-            settings
-        );
-        view = window.getDefaultView();
-        window.setVerticalSyncEnabled(true);
-        window.setFramerateLimit(60);
-    }
 
     void initializeCursors() {
         if (!defaultCursor.loadFromSystem(sf::Cursor::Arrow) ||
@@ -172,7 +151,6 @@ private:
 
     void initializeUI() {
         setupText();
-        setupButtons();
         setupHeaders();
     }
 
@@ -182,195 +160,7 @@ private:
         gradient = GenerateGradient(startColor, endColor, gradientStepMax);
     }
 
-    void createCopyObjects() {
-        copyObjCir = new Circle(ball_color2, 0, 0, 4);
-        copyObjRec = new RectangleClass(3, 3, ball_color2, 0, 0);
-    }
 
-    void runSimulation() {
-        handleSimulationEvents();
-        updateSimulation();
-        renderSimulation();
-    }
-
-    void handleEvent(sf::Event event) {
-        sf::Vector2i currentMousePosInt = sf::Mouse::getPosition(window);
-        sf::Vector2f currentMousePos = window.mapPixelToCoords(currentMousePosInt, view);
-        if (event.type == sf::Event::Closed) { window.close(); }
-        if (event.type == sf::Event::MouseWheelScrolled) {
-            if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel && !scaleFlag) {
-                if (event.mouseWheelScroll.delta > 0)
-                    view.zoom(1.f / ZOOM_FACTOR);
-                else if (event.mouseWheelScroll.delta < 0)
-                    view.zoom(ZOOM_FACTOR);
-            }
-        }
-        if (event.type == sf::Event::KeyPressed) {
-            if (event.key.code == sf::Keyboard::Escape) {
-                screen = "MAIN MENU";
-                objectList.DeleteAll();
-                objCount = 0;
-            }
-            if (event.key.code == sf::Keyboard::A) {
-                for (size_t i = 0; i < 10; i++)
-                {
-                    BaseShape* newObject = objectList.CreateNewCircle(options.gravity, gradient[gradientStep], spawnStartingPoint, initialVel);
-                    objCount += 1;
-                    gradientStep += 1;
-                    spawnStartingPoint.x += startingPointAdder;
-                    if (gradientStep == gradientStepMax) {
-                        std::reverse(gradient.begin(), gradient.end());
-                        gradientStep = 0;
-                    }
-                    if (spawnStartingPoint.x >= options.window_width - radius || spawnStartingPoint.x <= radius)
-                    {
-                        startingPointAdder *= -1;
-                    }
-                    objectList.connectedObjects.AddObject(newObject);
-                }
-            }
-            if (event.key.code == sf::Keyboard::T) {
-                for (size_t i = 0; i < 10; i++)
-                {
-                    objectList.CreateNewRectangle(options.gravity, gradient[gradientStep], spawnStartingPoint);
-                    objCount += 1;
-                    gradientStep += 1;
-                    spawnStartingPoint.x += startingPointAdder;
-                    if (gradientStep == gradientStepMax) {
-                        std::reverse(gradient.begin(), gradient.end());
-                        gradientStep = 0;
-                    }
-                    if (spawnStartingPoint.x >= options.window_width - radius || spawnStartingPoint.x <= radius)
-                    {
-                        startingPointAdder *= -1;
-                    }
-                }
-            }
-            if (event.key.code == sf::Keyboard::C) {
-                if (!connectingMode)
-                {
-                    connectingMode = true;
-                    previousBallPointer = thisBallPointer;
-                    linkingText.setString("ACTIVATED");
-                    linkingText.setFillColor(sf::Color::Magenta);
-                }
-                else {
-                    connectingMode = false;
-                    linkingText.setString("DEACTIVATED");
-                    linkingText.setFillColor(sf::Color::White);
-                }
-            }
-            if (event.key.code == sf::Keyboard::BackSpace && mouseFlagClick) {
-                objectList.DeleteThisObj(thisBallPointer);
-            }
-
-            if (event.key.code == sf::Keyboard::H) {
-                for (size_t i = 0; i < 1; i++)
-                {
-                    BaseShape* newObject = objectList.CreateNewCircle(options.gravity, gradient[gradientStep], currentMousePos, initialVel);
-                    objCount += 1;
-                    objectList.connectedObjects.AddObject(newObject);
-                    objectList.connectedObjects.ConnectRandom(10);
-                }
-            }
-            if (event.key.code == sf::Keyboard::F11)
-            {
-                if (!options.fullscreen)
-                {
-                    window.create(options.desktopSize, "Fullscreen Mode", sf::Style::Fullscreen);
-                    options.fullscreen = true;
-                }
-                else {
-                    window.create(sf::VideoMode(1920, 980), "Tomy Mode", sf::Style::Default);
-                    options.fullscreen = false;
-                }
-            }
-            if (event.key.code == sf::Keyboard::L) {
-                planetMode = true;
-                objectList.CreateNewPlanet(7000, ball_color, currentMousePos, 20, 5.9722 * pow(10, 15));;
-                objCount += 1;
-            }
-            if (event.key.code == sf::Keyboard::F) {
-                sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                objectList.CreateNewCircle(options.gravity, explosion, sf::Vector2f(currentMousePos.x + 3, currentMousePos.y + 3), initialVel);
-                for (size_t i = 0; i < 50; i++)
-                {
-                    objectList.CreateNewCircle(options.gravity, explosion, currentMousePos, initialVel);
-                    objCount += 1;
-                }
-            }
-            if (event.key.code == sf::Keyboard::J) {
-                sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                objectList.CreateNewRectangle(options.gravity, explosion, sf::Vector2f(currentMousePos.x + 3, currentMousePos.y + 3));
-                for (size_t i = 0; i < 50; i++)
-                {
-                    objectList.CreateNewRectangle(options.gravity, explosion, currentMousePos);
-                    objCount += 1;
-                }
-            }
-            if (event.key.code == sf::Keyboard::R) {
-                objectList.DeleteAll();
-                objCount = 0;
-            }
-
-            if (event.key.code == sf::Keyboard::S && mouseFlagClick)
-            {
-                scaleFlag = true;
-            }
-
-            if (event.key.code == sf::Keyboard::Left)
-                view.move(-moveSpeedScreen, 0.f);
-            if (event.key.code == sf::Keyboard::Right)
-                view.move(moveSpeedScreen, 0.f);
-            if (event.key.code == sf::Keyboard::Up)
-                view.move(0.f, -moveSpeedScreen);
-            if (event.key.code == sf::Keyboard::Down)
-                view.move(0.f, moveSpeedScreen);
-
-        }
-        if (event.type == sf::Event::MouseButtonReleased) {
-            mouseFlagClick = false;
-            scaleFlag = false;
-            if (thisBallPointer != nullptr)
-            {
-                window.setMouseCursor(defaultCursor);
-                thisBallPointer->setColor(previousColor);
-                thisBallPointer->SetOutline(outlineColor, 0);
-            }
-            TouchedOnce = false;
-        }
-        if (event.type == sf::Event::MouseWheelScrolled) {
-            if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel && !scaleFlag) {
-                //sf::Vector2f beforeZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
-
-                if (event.mouseWheelScroll.delta > 0) {
-
-
-                    view.zoom(1.f / ZOOM_FACTOR);
-                    mouseFlagScrollUp = true;
-                }
-
-                else if (event.mouseWheelScroll.delta < 0) {
-                    view.zoom(ZOOM_FACTOR);
-                    mouseFlagScrollDown = true;
-                }
-
-                //sf::Vector2f afterZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
-                //sf::Vector2f offset = beforeZoom - afterZoom;
-                //view.move(offset);
-            }
-        }
-    }
-
-    
-
-    void handleSimulationEvents() {
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            handleEvent(event);
-        }
-        handleMouseInteraction();
-    }
 
     void updateSimulation() {
         updateFPS();
@@ -381,7 +171,6 @@ private:
         window.clear(background_color);
         window.setView(view);
 
-        copyObjCir->draw(window);
         objectList.MoveAndDraw(window, currentFPS, elastic, planetMode);
 
         window.setView(window.getDefaultView());
@@ -445,22 +234,11 @@ private:
             }
             */
         }
-        catch (const std::exception& e) {
-            std::cerr << "Texture loading error: " << e.what() << std::endl;
+        catch (const std::exception& error) {
+            std::cerr << "Texture loading error: " << error.what() << std::endl;
         }
     }
 
-    void handleMouseInteraction() {
-        sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
-        sf::Vector2f worldPos = window.mapPixelToCoords(currentMousePos, view);
-
-        if (previousMousePos == nullptr) {
-            previousMousePos = new sf::Vector2f(worldPos);
-        }
-
-        updateObjectPosition(worldPos);
-        *previousMousePos = worldPos;
-    }
 
     void updateFPS() {
         frameCount++;
@@ -494,29 +272,6 @@ private:
         linkingText.setPosition(10, 70);
     }
 
-    void setupButtons() {
-    // Main Menu Buttons
-    mainMenuButtonVec.emplace_back(
-        Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 450), "START"),
-        false);
-
-    mainMenuButtonVec.emplace_back(
-        Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 675), "SETTINGS"),
-        false);
-
-    mainMenuButtonVec.emplace_back(
-        Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 925), "EXIT"),
-        false);
-
-    // Settings Buttons
-    settingsButtonVec.emplace_back(
-        Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 350), "FULLSCREEN"),
-        false);
-
-    settingsButtonVec.emplace_back(
-        Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 550), "MAIN MENU"),
-        false);
-}
 
     void setupHeaders() {
         headerText.setSize(sf::Vector2f(400.f, 100.f));
@@ -527,263 +282,242 @@ private:
         headerText.setFillColor(buttonColor);
     }
 
-    void handleKeyPress(sf::Event::KeyEvent key) {
-        switch (key.code) {
-        case sf::Keyboard::Escape:
-            screen = "MAIN MENU";
-            objectList.DeleteAll();
-            objCount = 0;
-            break;
+    void handleEvent(sf::Event event) {
+        if (event.type == sf::Event::Closed) { window.close(); }
+        handleKeyPress(event);
+        //handleMouseWheel(event.mouseWheelScroll);
+    }
 
-        case sf::Keyboard::A:
-            for (size_t i = 0; i < 10; i++) {
-                BaseShape* newObject = objectList.CreateNewCircle(options.gravity, gradient[gradientStep], spawnStartingPoint, initialVel);
-                objCount++;
-                gradientStep++;
-                spawnStartingPoint.x += startingPointAdder;
 
-                if (gradientStep == gradientStepMax) {
-                    std::reverse(gradient.begin(), gradient.end());
-                    gradientStep = 0;
-                }
+    void handleSimulationEvents() {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            handleEvent(event);
+        }
+        handleMouseClick(event);
+        handleMouseInteraction();
+    }
 
-                if (spawnStartingPoint.x >= options.window_width - radius || spawnStartingPoint.x <= radius) {
-                    startingPointAdder *= -1;
-                }
-
-                objectList.connectedObjects.AddObject(newObject);
+    void handleKeyPress(sf::Event event) {
+        if (event.type == sf::Event::KeyPressed) {
+            if (event.key.code == sf::Keyboard::Escape) {
+                screen = "MAIN MENU";
+                objectList.DeleteAll();
+                objCount = 0;
             }
-            break;
-
-        case sf::Keyboard::T:
-            for (size_t i = 0; i < 10; i++) {
-                objectList.CreateNewRectangle(options.gravity, gradient[gradientStep], spawnStartingPoint);
-                objCount++;
-                gradientStep++;
-                spawnStartingPoint.x += startingPointAdder;
-
-                if (gradientStep == gradientStepMax) {
-                    std::reverse(gradient.begin(), gradient.end());
-                    gradientStep = 0;
-                }
-
-                if (spawnStartingPoint.x >= options.window_width - radius || spawnStartingPoint.x <= radius) {
-                    startingPointAdder *= -1;
+            if (event.key.code == sf::Keyboard::A) {
+                for (size_t i = 0; i < 10; i++)
+                {
+                    BaseShape* newObject = objectList.CreateNewCircle(options.gravity, gradient[gradientStep], spawnStartingPoint, initialVel);
+                    objCount += 1;
+                    gradientStep += 1;
+                    spawnStartingPoint.x += startingPointAdder;
+                    if (gradientStep == gradientStepMax) {
+                        std::reverse(gradient.begin(), gradient.end());
+                        gradientStep = 0;
+                    }
+                    if (spawnStartingPoint.x >= options.window_width - radius || spawnStartingPoint.x <= radius)
+                    {
+                        startingPointAdder *= -1;
+                    }
+                    objectList.connectedObjects.AddObject(newObject);
                 }
             }
-            break;
-
-        case sf::Keyboard::C:
-            toggleConnectingMode();
-            break;
-
-        case sf::Keyboard::BackSpace:
-            if (mouseFlagClick) {
+            if (event.key.code == sf::Keyboard::T) {
+                for (size_t i = 0; i < 10; i++)
+                {
+                    objectList.CreateNewRectangle(options.gravity, gradient[gradientStep], spawnStartingPoint);
+                    objCount += 1;
+                    gradientStep += 1;
+                    spawnStartingPoint.x += startingPointAdder;
+                    if (gradientStep == gradientStepMax) {
+                        std::reverse(gradient.begin(), gradient.end());
+                        gradientStep = 0;
+                    }
+                    if (spawnStartingPoint.x >= options.window_width - radius || spawnStartingPoint.x <= radius)
+                    {
+                        startingPointAdder *= -1;
+                    }
+                }
+            }
+            if (event.key.code == sf::Keyboard::C) {
+                if (!connectingMode)
+                {
+                    connectingMode = true;
+                    previousBallPointer = thisBallPointer;
+                    linkingText.setString("ACTIVATED");
+                    linkingText.setFillColor(sf::Color::Magenta);
+                }
+                else {
+                    connectingMode = false;
+                    linkingText.setString("DEACTIVATED");
+                    linkingText.setFillColor(sf::Color::White);
+                }
+            }
+            if (event.key.code == sf::Keyboard::BackSpace && mouseClickFlag) {
                 objectList.DeleteThisObj(thisBallPointer);
             }
-            break;
-
-        case sf::Keyboard::H:
-            createConnectedObjects();
-            break;
-
-        case sf::Keyboard::F11:
-            toggleFullscreen();
-            break;
-
-        case sf::Keyboard::L:
-            createPlanet();
-            break;
-
-        case sf::Keyboard::F:
-            createExplosionCircles();
-            break;
-
-        case sf::Keyboard::J:
-            createExplosionRectangles();
-            break;
-
-        case sf::Keyboard::R:
-            objectList.DeleteAll();
-            objCount = 0;
-            break;
-
-        case sf::Keyboard::S:
-            if (mouseFlagClick) {
+            if (event.key.code == sf::Keyboard::H) {
+                for (size_t i = 0; i < 1; i++)
+                {
+                    BaseShape* newObject = objectList.CreateNewCircle(options.gravity, gradient[gradientStep], currentMousePos, initialVel);
+                    objCount += 1;
+                    objectList.connectedObjects.AddObject(newObject);
+                    objectList.connectedObjects.ConnectRandom(10);
+                }
+            }
+            if (event.key.code == sf::Keyboard::F11)
+            {
+                if (!options.fullscreen)
+                {
+                    window.create(options.desktopSize, "Fullscreen Mode", sf::Style::Fullscreen);
+                    options.fullscreen = true;
+                }
+                else {
+                    window.create(sf::VideoMode(1920, 980), "Tomy Mode", sf::Style::Default);
+                    options.fullscreen = false;
+                }
+            }
+            if (event.key.code == sf::Keyboard::L) {
+                planetMode = true;
+                objectList.CreateNewPlanet(7000, ball_color, currentMousePos, 20, 5.9722 * pow(10, 15));;
+                objCount += 1;
+            }
+            if (event.key.code == sf::Keyboard::F) {
+                sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+                objectList.CreateNewCircle(options.gravity, explosion, sf::Vector2f(currentMousePos.x + 3, currentMousePos.y + 3), initialVel);
+                for (size_t i = 0; i < 50; i++)
+                {
+                    objectList.CreateNewCircle(options.gravity, explosion, currentMousePos, initialVel);
+                    objCount += 1;
+                }
+            }
+            if (event.key.code == sf::Keyboard::J) {
+                sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+                objectList.CreateNewRectangle(options.gravity, explosion, sf::Vector2f(currentMousePos.x + 3, currentMousePos.y + 3));
+                for (size_t i = 0; i < 50; i++)
+                {
+                    objectList.CreateNewRectangle(options.gravity, explosion, currentMousePos);
+                    objCount += 1;
+                }
+            }
+            if (event.key.code == sf::Keyboard::R) {
+                objectList.DeleteAll();
+                objCount = 0;
+            }
+            if (event.key.code == sf::Keyboard::S && mouseClickFlag)
+            {
                 scaleFlag = true;
             }
-            break;
-
-            // Arrow key movement
-        case sf::Keyboard::Left:
-            view.move(-moveSpeedScreen, 0.f);
-            break;
-        case sf::Keyboard::Right:
-            view.move(moveSpeedScreen, 0.f);
-            break;
-        case sf::Keyboard::Up:
-            view.move(0.f, -moveSpeedScreen);
-            break;
-        case sf::Keyboard::Down:
-            view.move(0.f, moveSpeedScreen);
-            break;
+            if (event.key.code == sf::Keyboard::Left)
+                view.move(-moveSpeedScreen, 0.f);
+            if (event.key.code == sf::Keyboard::Right)
+                view.move(moveSpeedScreen, 0.f);
+            if (event.key.code == sf::Keyboard::Up)
+                view.move(0.f, -moveSpeedScreen);
+            if (event.key.code == sf::Keyboard::Down)
+                view.move(0.f, moveSpeedScreen);
         }
     }
 
-    void handleMouseButton(sf::Event::MouseButtonEvent button) {
-        if (button.button == sf::Mouse::Left) {
-            if (button.button == sf::Event::MouseButtonReleased) {
-                mouseFlagClick = false;
-                scaleFlag = false;
-                if (thisBallPointer != nullptr) {
-                    window.setMouseCursor(defaultCursor);
-                    thisBallPointer->setColor(previousColor);
-                    thisBallPointer->SetOutline(outlineColor, 0);
-                }
-                TouchedOnce = false;
+    void handleMouseClick(sf::Event event) {
+        if (event.type == sf::Event::MouseButtonReleased) {
+            mouseClickFlag = false;
+            scaleFlag = false;
+            if (thisBallPointer != nullptr)
+            {
+                window.setMouseCursor(defaultCursor);
+                thisBallPointer->setColor(previousColor);
+                thisBallPointer->SetOutline(outlineColor, 0);
             }
-            else if (button.button == sf::Event::MouseButtonPressed && !mouseFlagClick) {
-                sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                sf::Vector2f worldPos = window.mapPixelToCoords(mousePos, view);
-                thisBallPointer = objectList.IsInRadius(worldPos);
-
-                if (previousBallPointer == nullptr) {
-                    previousBallPointer = thisBallPointer;
-                }
-
-                if (thisBallPointer != nullptr) {
-                    mouseFlagClick = true;
-                    window.setMouseCursor(handCursor);
-                }
+            TouchedOnce = false;
+        }
+        else if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && mouseClickFlag == false) {
+            thisBallPointer = objectList.IsInRadius(currentMousePos); // Check if a circle is within radius
+            if (previousBallPointer == nullptr)
+            {
+                previousBallPointer = thisBallPointer;
+            }
+            if (thisBallPointer != nullptr) { // Check if a circle was found
+                mouseClickFlag = true; // Set flag if circle found
+                window.setMouseCursor(handCursor);
             }
         }
     }
 
-    void handleMouseWheel(sf::Event::MouseWheelScrollEvent wheel) {
-        if (wheel.wheel == sf::Mouse::VerticalWheel && !scaleFlag) {
-            if (wheel.delta > 0) {
-                view.zoom(1.f / ZOOM_FACTOR);
-                mouseFlagScrollUp = true;
-            }
-            else if (wheel.delta < 0) {
-                view.zoom(ZOOM_FACTOR);
-                mouseFlagScrollDown = true;
-            }
-        }
-    }
-
-    void updateObjectPosition(const sf::Vector2f& position) {
-        if (mouseFlagClick && thisBallPointer != nullptr) {
-            thisBallPointer->SetPosition(position);
-
-            if (!TouchedOnce) {
+    void handleMouseInteraction() {
+        if (mouseClickFlag) { // Check if a circle is found
+            thisBallPointer->SetPosition(currentMousePos); // Set position of the found ball
+            if (!TouchedOnce)
+            {
                 thisBallPointer->SetOutline(outlineColor, 5);
+                // Get the current color
                 sf::Color currentColor = thisBallPointer->GetColor();
                 previousColor = currentColor;
-
+                // Darken the color by reducing the RGB values (without going below 0)
                 currentColor.r = std::max(0, currentColor.r - 15);
                 currentColor.g = std::max(0, currentColor.g - 15);
                 currentColor.b = std::max(0, currentColor.b - 15);
 
+                // Apply the new color to the rectangle
                 thisBallPointer->setColor(currentColor);
                 TouchedOnce = true;
             }
-
-            handleScaling();
-            handleConnecting();
-        }
-    }
-
-    void toggleFullscreen() {
-        if (!options.fullscreen) {
-            window.create(options.desktopSize, "Fullscreen Mode", sf::Style::Fullscreen);
-            options.fullscreen = true;
-        }
-        else {
-            window.create(sf::VideoMode(1920, 980), "Tomy Mode", sf::Style::Default);
-            options.fullscreen = false;
-        }
-        window.setVerticalSyncEnabled(true);
-    }
-
-    std::string handleMainMenu() {
-        window.setTitle("Main Menu");
-
-        sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
-        sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePos);
-        bool mouseClickFlag = false;
-
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
-            }
-            if (event.type == sf::Event::MouseButtonReleased) {
-                mouseClickFlag = true;
-            }
-        }
-
-        window.clear(mainMenuBackgroundColor);
-
-        if (mouseClickFlag) {
-            for (auto& pair : mainMenuButtonVec) {
-                if (pair.first.IsInRadius(mousePosFloat)) {
-                    return pair.first.GetName();
+            if (scaleFlag && mouseFlagScrollUp || mouseFlagScrollDown) {
+                if (Circle* circle = dynamic_cast<Circle*>(thisBallPointer)) {
+                    if (mouseFlagScrollDown && circle->getRadius() > 0.0001) {
+                        circle->SetRadiusAndCenter(circle->getRadius() - mouseScrollPower);
+                        circle->SetMass(circle->GetMass() - mouseScrollPower * 10);
+                        std::cout << circle->getRadius();
+                        mouseFlagScrollDown = false;
+                    }
+                    else {
+                        circle->SetRadiusAndCenter(circle->getRadius() + mouseScrollPower);
+                        circle->SetMass(circle->GetMass() + mouseScrollPower * 10);
+                        mouseFlagScrollUp = false;
+                    }
+                }
+                else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(thisBallPointer))
+                {
+                    if (mouseFlagScrollDown && rectangle->GetHeight() > 0.0001 && rectangle->GetWidth() > 0.0001) {
+                        rectangle->SetSizeAndOrigin(rectangle->GetWidth() - mouseScrollPower, rectangle->GetHeight() - mouseScrollPower);
+                        rectangle->SetMass(rectangle->GetMass() - mouseScrollPower * 10);
+                        mouseFlagScrollDown = false;
+                    }
+                    else {
+                        rectangle->SetSizeAndOrigin(rectangle->GetWidth() + mouseScrollPower, rectangle->GetHeight() + mouseScrollPower);
+                        rectangle->SetMass(rectangle->GetMass() + mouseScrollPower * 10);
+                        mouseFlagScrollUp = false;
+                    }
                 }
             }
+            else if (connectingMode && thisBallPointer != previousBallPointer)
+            {
+                objectList.connectedObjects.MakeNewLink(previousBallPointer, thisBallPointer);
+            }
         }
-
-        for (auto& button : mainMenuButtonVec) {
-            button.second = button.first.MouseHover(mousePosFloat, hovering);
-        }
-
-        window.draw(headerText);
-        for (auto& button : mainMenuButtonVec) {
-            button.first.draw(window);
-        }
-
-        window.display();
-        return "MAIN MENU";
     }
 
-    std::string handleSettings() {
-        window.setTitle("Settings");
+    void handleMouseWheel(sf::Event::MouseWheelScrollEvent event) {
+        if (event.wheel == sf::Mouse::VerticalWheel && !scaleFlag) {
+            //sf::Vector2f beforeZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
 
-        sf::Vector2i currentMousePos = sf::Mouse::getPosition(window);
-        sf::Vector2f mousePosFloat = static_cast<sf::Vector2f>(currentMousePos);
-        bool mouseClickFlag = false;
+            if (event.delta > 0) {
 
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
+
+                view.zoom(1.f / ZOOM_FACTOR);
+                mouseFlagScrollUp = true;
             }
-            if (event.type == sf::Event::MouseButtonReleased) {
-                mouseClickFlag = true;
+
+            else if (event.delta < 0) {
+                view.zoom(ZOOM_FACTOR);
+                mouseFlagScrollDown = true;
             }
+
+            //sf::Vector2f afterZoom = window.mapPixelToCoords(sf::Vector2i(event.mouseWheelScroll.x, event.mouseWheelScroll.y), view);
+            //sf::Vector2f offset = beforeZoom - afterZoom;
+            //view.move(offset);
         }
-
-        window.clear(mainMenuBackgroundColor);
-
-        if (mouseClickFlag) {
-            for (auto& button : settingsButtonVec) {
-                if (button.first.IsInRadius(mousePosFloat)) {
-                    return button.first.GetName();
-                }
-            }
-        }
-
-        for (auto& button : settingsButtonVec) {
-            button.second = button.first.MouseHover(mousePosFloat, hovering);
-        }
-
-        window.draw(headerText);
-        for (auto& button : settingsButtonVec) {
-            button.first.draw(window);
-        }
-
-        window.display();
-        return "SETTINGS";
     }
 
     void renderUI() {
@@ -816,11 +550,8 @@ private:
     }
 
     void createConnectedObjects() {
-        sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-        sf::Vector2f worldPos = window.mapPixelToCoords(mousePos, view);
-
         for (size_t i = 0; i < 1; i++) {
-            BaseShape* newObject = objectList.CreateNewCircle(options.gravity, gradient[gradientStep], worldPos, initialVel);
+            BaseShape* newObject = objectList.CreateNewCircle(options.gravity, gradient[gradientStep], currentMousePos, initialVel);
             objCount++;
             objectList.connectedObjects.AddObject(newObject);
             objectList.connectedObjects.ConnectRandom(10);
@@ -829,9 +560,7 @@ private:
 
     void createPlanet() {
         planetMode = true;
-        sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-        sf::Vector2f worldPos = window.mapPixelToCoords(mousePos, view);
-        objectList.CreateNewPlanet(7000, ball_color, worldPos, 20, 5.9722 * pow(10, 15));
+        objectList.CreateNewPlanet(7000, ball_color, currentMousePos, 20, 5.9722 * pow(10, 15));
         objCount++;
     }
 
@@ -853,37 +582,276 @@ private:
     }
 
     void createExplosionCircles() {
-        sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-        sf::Vector2f worldPos = window.mapPixelToCoords(mousePos, view);
-
-        objectList.CreateNewCircle(options.gravity, explosion, sf::Vector2f(worldPos.x + 3, worldPos.y + 3), initialVel);
+        objectList.CreateNewCircle(options.gravity, explosion, sf::Vector2f(currentMousePos.x + 3, currentMousePos.y + 3), initialVel);
         for (size_t i = 0; i < 50; i++) {
-            objectList.CreateNewCircle(options.gravity, explosion, worldPos, initialVel);
+            objectList.CreateNewCircle(options.gravity, explosion, currentMousePos, initialVel);
             objCount++;
         }
     }
 
     void createExplosionRectangles() {
-        sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-        sf::Vector2f worldPos = window.mapPixelToCoords(mousePos, view);
-
-        objectList.CreateNewRectangle(options.gravity, explosion, sf::Vector2f(worldPos.x + 3, worldPos.y + 3));
+        objectList.CreateNewRectangle(options.gravity, explosion, sf::Vector2f(currentMousePos.x + 3, currentMousePos.y + 3));
         for (size_t i = 0; i < 50; i++) {
-            objectList.CreateNewRectangle(options.gravity, explosion, worldPos);
+            objectList.CreateNewRectangle(options.gravity, explosion, currentMousePos);
             objCount++;
         }
     }
 };
 
-// Main function
+class MainMenu
+{
+private:
+    sf::RenderWindow& window;
+    sf::Color settingsBackgroundColor = sf::Color(25, 25, 25);
+    std::vector<std::pair<Button, bool>> mainMenuButtonVec;
+    sf::RectangleShape headerText;
+    bool hovering = false;
+    bool mouseClickFlag = false;
+    sf::Vector2f currentMousePos;
+    float textureResizer = 1.2;
+    float headerTextureResizer = 1.2;
+
+
+public:
+    MainMenu(sf::RenderWindow& window):window(window) { setupButtons(); };
+
+    void setupButtons() {
+        sf::RectangleShape headerText = sf::RectangleShape(sf::Vector2f(1212 / headerTextureResizer, 80 / headerTextureResizer));
+        headerText.setOrigin(headerText.getSize().x / 2, headerText.getSize().y / 2);
+        headerText.setPosition(options.window_width / 2, options.window_height / 2 - 350);
+        sf::Texture startButtonTexture;
+        sf::Texture exitButtonTexture;
+        sf::Texture settingsButtonTexture;
+        sf::Texture mainMenuHeaderTexture;
+        if (!startButtonTexture.loadFromFile("START.png")) { throw std::runtime_error("Failed to load textures"); }
+        if (!exitButtonTexture.loadFromFile("EXIT.png")) { throw std::runtime_error("Failed to load textures"); }
+        if (!settingsButtonTexture.loadFromFile("SETTINGS.png")) { throw std::runtime_error("Failed to load textures"); }
+        if (!mainMenuHeaderTexture.loadFromFile("Header.png")) { throw std::runtime_error("Failed to load textures"); }
+        startButtonTexture.setSmooth(true);
+        exitButtonTexture.setSmooth(true);
+        settingsButtonTexture.setSmooth(true);
+        mainMenuHeaderTexture.setSmooth(true);
+        Button startButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 450), "START");
+        Button settingsButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 675), "SETTINGS");
+        Button exitButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 925), "EXIT");
+        startButtonMainMenu.SetTexture(startButtonTexture);
+        settingsButtonMainMenu.SetTexture(settingsButtonTexture);
+        exitButtonMainMenu.SetTexture(exitButtonTexture);
+        headerText.setTexture(&mainMenuHeaderTexture);
+        mainMenuButtonVec.push_back(std::make_pair(startButtonMainMenu, false));
+        mainMenuButtonVec.push_back(std::make_pair(settingsButtonMainMenu, false));
+        mainMenuButtonVec.push_back(std::make_pair(exitButtonMainMenu, false));
+
+        //settings
+        //sf::RectangleShape settingsHeaderText = sf::RectangleShape(sf::Vector2f(555 / headerTextureResizer, 79 / headerTextureResizer));
+        //settingsHeaderText.setOrigin(settingsHeaderText.getSize().x / 2, settingsHeaderText.getSize().y / 2);
+        //settingsHeaderText.setPosition(options.window_width / 2, options.window_height / 2 - 350);
+        //sf::Texture SettingsHeaderTexture;
+        //sf::Texture fullscreenButtonTexture;
+        //if (!fullscreenButtonTexture.loadFromFile("FULLSCREEN.png")) { throw std::runtime_error("Failed to load textures"); }
+        //if (!SettingsHeaderTexture.loadFromFile("SETTINGS_HEADER.png")) { throw std::runtime_error("Failed to load textures"); }
+        //fullscreenButtonTexture.setSmooth(true);;
+        //SettingsHeaderTexture.setSmooth(true);;
+        //Button fullscreenButton = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 350), "FULLSCREEN");
+        //Button exitButtonSettings = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 550), "MAIN MENU");
+        //fullscreenButton.SetTexture(fullscreenButtonTexture);
+        //settingsHeaderText.setTexture(&SettingsHeaderTexture);
+        //exitButtonSettings.SetTexture(exitButtonTexture);
+        //settingsButtonVec.push_back(std::make_pair(fullscreenButton, false));
+        //settingsButtonVec.push_back(std::make_pair(exitButtonSettings, false));
+    }
+
+
+    std::string handleMainMenu() {
+        window.setTitle("Main Menu");
+        currentMousePos = static_cast<sf::Vector2f>(sf::Mouse::getPosition(window));
+        mouseClickFlag = false;
+
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window.close();
+            }
+            if (event.type == sf::Event::MouseButtonReleased) {
+                mouseClickFlag = true;
+            }
+        }
+
+        window.clear(settingsBackgroundColor);
+
+        if (mouseClickFlag) {
+            for (auto& pair : mainMenuButtonVec) {
+                if (pair.first.IsInRadius(currentMousePos)) {
+                    return pair.first.GetName();
+                }
+            }
+        }
+
+        for (auto& button : mainMenuButtonVec) {
+            button.second = button.first.MouseHover(currentMousePos, hovering);
+        }
+
+        window.draw(headerText);
+        for (auto& button : mainMenuButtonVec) {
+            button.first.draw(window);
+        }
+
+        window.display();
+        return "MAIN MENU";
+    }
+};
+
+class Settings
+{
+private:
+    sf::RenderWindow& window;
+    sf::Color settingsBackgroundColor = sf::Color(25, 25, 25);
+    std::vector<std::pair<Button, bool>> settingsButtonVec;
+    sf::RectangleShape headerText;
+    bool hovering = false;
+    bool mouseClickFlag = false;
+    sf::Vector2f currentMousePos;
+    float textureResizer = 1.2;
+    float headerTextureResizer = 1.2;
+
+
+public:
+    Settings(sf::RenderWindow& window) :window(window) {
+        setupButtons();
+    };
+
+    void setupButtons() {
+        sf::RectangleShape headerText = sf::RectangleShape(sf::Vector2f(1212 / headerTextureResizer, 80 / headerTextureResizer));
+        headerText.setOrigin(headerText.getSize().x / 2, headerText.getSize().y / 2);
+        headerText.setPosition(options.window_width / 2, options.window_height / 2 - 350);
+        sf::Texture startButtonTexture;
+        sf::Texture exitButtonTexture;
+        sf::Texture settingsButtonTexture;
+        sf::Texture mainMenuHeaderTexture;
+        if (!startButtonTexture.loadFromFile("START.png")) { throw std::runtime_error("Failed to load textures"); }
+        if (!exitButtonTexture.loadFromFile("EXIT.png")) { throw std::runtime_error("Failed to load textures"); }
+        if (!settingsButtonTexture.loadFromFile("SETTINGS.png")) { throw std::runtime_error("Failed to load textures"); }
+        if (!mainMenuHeaderTexture.loadFromFile("Header.png")) { throw std::runtime_error("Failed to load textures"); }
+        startButtonTexture.setSmooth(true);
+        exitButtonTexture.setSmooth(true);
+        settingsButtonTexture.setSmooth(true);
+        mainMenuHeaderTexture.setSmooth(true);
+        Button startButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 450), "START");
+        Button settingsButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 675), "SETTINGS");
+        Button exitButtonMainMenu = Button(534 / textureResizer, 274 / textureResizer, sf::Vector2f(options.window_width / 2, 925), "EXIT");
+        startButtonMainMenu.SetTexture(startButtonTexture);
+        settingsButtonMainMenu.SetTexture(settingsButtonTexture);
+        exitButtonMainMenu.SetTexture(exitButtonTexture);
+        headerText.setTexture(&mainMenuHeaderTexture);
+        settingsButtonVec.push_back(std::make_pair(startButtonMainMenu, false));
+        settingsButtonVec.push_back(std::make_pair(settingsButtonMainMenu, false));
+        settingsButtonVec.push_back(std::make_pair(exitButtonMainMenu, false));
+
+
+    }
+
+    std::string handleSettings() {
+        window.setTitle("Settings");
+
+        currentMousePos = static_cast<sf::Vector2f>(sf::Mouse::getPosition(window));
+        mouseClickFlag = false;
+
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window.close();
+            }
+            if (event.type == sf::Event::MouseButtonReleased) {
+                mouseClickFlag = true;
+            }
+        }
+
+        window.clear(settingsBackgroundColor);
+
+        if (mouseClickFlag) {
+            for (auto& button : settingsButtonVec) {
+                if (button.first.IsInRadius(currentMousePos)) {
+                    return button.first.GetName();
+                }
+            }
+        }
+
+        for (auto& button : settingsButtonVec) {
+            button.second = button.first.MouseHover(currentMousePos, hovering);
+        }
+
+        window.draw(headerText);
+        for (auto& button : settingsButtonVec) {
+            button.first.draw(window);
+        }
+
+        window.display();
+        return "SETTINGS";
+    }
+
+};
+
+void initializeWindow(sf::RenderWindow& window, sf::View view, sf::ContextSettings settings) {
+    window.create(
+        sf::VideoMode(options.window_width, options.window_height),"TomySim",sf::Style::Default,settings);
+    view = window.getDefaultView();
+    window.setVerticalSyncEnabled(true);
+    window.setFramerateLimit(60);
+}
+
+void toggleFullscreen(sf::RenderWindow& window) {
+    if (!options.fullscreen) {
+        window.create(options.desktopSize, "Fullscreen Mode", sf::Style::Fullscreen);
+        options.fullscreen = true;
+    }
+    else {
+        window.create(sf::VideoMode(1920, 980), "Tomy Mode", sf::Style::Default);
+        options.fullscreen = false;
+    }
+    window.setVerticalSyncEnabled(true);
+}
+
+void Run(std::string& screen, PhysicsSimulation& simulation, MainMenu& mainMenu, Settings& settingsClass, sf::RenderWindow& window) {
+    while (window.isOpen()) {
+        if (screen == "START") {
+            screen = simulation.Run();
+        }
+        else if (screen == "MAIN MENU") {
+            screen = mainMenu.handleMainMenu();
+        }
+        else if (screen == "SETTINGS") {
+            screen = settingsClass.handleSettings();
+        }
+        else if (screen == "FULLSCREEN") {
+            toggleFullscreen(window);
+            screen = settingsClass.handleSettings();
+        }
+        else {
+            window.close();
+            break;  // Add break to exit the loop when closing
+        }
+    }
+}
+
 int main() {
     try {
-        PhysicsSimulation simulation;
-        simulation.run();
+        sf::RenderWindow window;
+        sf::ContextSettings settings;
+        settings.antialiasingLevel = 8;
+        sf::View view = window.getDefaultView();
+        initializeWindow(window, view, settings);
+
+        PhysicsSimulation simulation(window);  // Remove the '=' to avoid copy initialization
+        MainMenu mainMenu(window);
+        Settings settingsClass(window);
+        std::string screen = "MAIN MENU";  // Changed from "MainMenu" to match your string comparisons
+
+        Run(screen, simulation, mainMenu, settingsClass, window);
+
         return 0;
     }
-    catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+    catch (const std::exception& error) {
+        std::cerr << "Error: " << error.what() << std::endl;
         return 1;
     }
 }
