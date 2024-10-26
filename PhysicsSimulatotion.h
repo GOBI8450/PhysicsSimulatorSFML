@@ -1,30 +1,30 @@
 #pragma once
-#include <SFML/Graphics.hpp>;
+#include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <sstream>
-#include <iostream> using namespace std;
+#include <iostream>
+#include <random>
+#include <ctime>
 #include "LineLink.h"
 #include "ObjectsList.h"
 #include "Grid.h"
 #include "Button.h"
 #include "Rectangle.h"
-#include <random>  // For random number generation
-#include <ctime>   // For seeding with current time
 #include <boost\asio.hpp>
+#include "Options.h"
 
-struct Options {
+
+class PhysicsSimulatotion
+{
+protected:
     sf::VideoMode desktopSize = sf::VideoMode::getDesktopMode();
     int window_height = desktopSize.height;
     int window_width = desktopSize.width;
     bool fullscreen = false;
     float gravity = 0;
     double massLock = 0;
-} options;
 
 
-class PhysicsSimulatotion
-{
-protected:
     // Window and view settings
     sf::RenderWindow& window;
     sf::View view;
@@ -118,162 +118,9 @@ public:
         spawnStartingPoint(posXStartingPoint, posYStartingPoint)
     {
         view = window.getDefaultView();  // Initialize view from window
-        initializeCursors();
-        loadResources();
-        initializeUI();
-        setupGradient();
     }
 
-
-    std::string Run() {
-        currentMousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window), view);
-        handleSimulationEvents();
-        renderSimulation();
-        return screen;
-    }
-
-private:
-
-    void initializeCursors() {
-        if (!defaultCursor.loadFromSystem(sf::Cursor::Arrow) ||
-            !handCursor.loadFromSystem(sf::Cursor::Hand)) {
-            throw std::runtime_error("Failed to load cursors");
-        }
-        window.setMouseCursor(defaultCursor);
-    }
-
-    void loadResources() {
-        if (!font.loadFromFile("font.ttf")) {
-            throw std::runtime_error("Failed to load font");
-        }
-        loadTextures();
-    }
-
-    void initializeUI() {
-        setupText();
-        setupHeaders();
-    }
-
-    void setupGradient() {
-        sf::Color startColor(128, 0, 128);  // purple
-        sf::Color endColor(0, 0, 255);      // blue
-        gradient = GenerateGradient(startColor, endColor, gradientStepMax);
-    }
-
-    void renderSimulation() {
-        updateFPS();
-        window.clear(background_color);
-        window.setView(view);
-
-        objectList.MoveAndDraw(window, currentFPS, elastic, planetMode);
-
-        window.setView(window.getDefaultView());
-        renderTexts();
-
-        window.display();
-
-        limitFrameRate();
-    }
-
-    // Helper methods for generating gradients
-    std::vector<sf::Color> GenerateGradient(sf::Color startColor, sf::Color endColor, int steps) {
-        std::vector<sf::Color> gradient;
-        float stepR = (endColor.r - startColor.r) / static_cast<float>(steps - 1);
-        float stepG = (endColor.g - startColor.g) / static_cast<float>(steps - 1);
-        float stepB = (endColor.b - startColor.b) / static_cast<float>(steps - 1);
-
-        for (int i = 0; i < steps; ++i) {
-            gradient.push_back(sf::Color(
-                startColor.r + stepR * i,
-                startColor.g + stepG * i,
-                startColor.b + stepB * i
-            ));
-        }
-        return gradient;
-    }
-
-
-    void loadTextures() {
-        // Since no textures are used in the original code, this method is kept minimal
-        // but provides a hook for future texture loading if needed
-        try {
-            // Currently no textures are loaded as the simulation uses basic shapes
-            // If textures are needed in the future, they can be loaded here:
-            /*
-            sf::Texture texture;
-            if (!texture.loadFromFile("path/to/texture.png")) {
-                throw std::runtime_error("Failed to load texture");
-            }
-            */
-        }
-        catch (const std::exception& error) {
-            std::cerr << "Texture loading error: " << error.what() << std::endl;
-        }
-    }
-
-
-    void updateFPS() {
-        frameCount++;
-        float timeElapsed = fpsClock.getElapsedTime().asSeconds();
-
-        if (timeElapsed >= 1.0f) {
-            currentFPS = frameCount / timeElapsed;
-            frameCount = 0;
-            fpsClock.restart();
-        }
-    }
-
-    void setupText() {
-        // FPS Text
-        fpsText.setFont(font);
-        fpsText.setCharacterSize(20);
-        fpsText.setFillColor(sf::Color::White);
-        fpsText.setPosition(10, 10);
-
-        // Balls Count Text
-        ballsCountText.setFont(font);
-        ballsCountText.setCharacterSize(20);
-        ballsCountText.setFillColor(sf::Color::White);
-        ballsCountText.setPosition(10, 40);
-
-        // Linking Text
-        linkingText.setFont(font);
-        linkingText.setString("DEACTIVATED");
-        linkingText.setCharacterSize(20);
-        linkingText.setFillColor(sf::Color::White);
-        linkingText.setPosition(10, 70);
-    }
-
-    void setupHeaders() {
-        headerText.setSize(sf::Vector2f(400.f, 100.f));
-        headerText.setPosition(
-            options.window_width / 2.f - headerText.getSize().x / 2.f,
-            100.f
-        );
-        headerText.setFillColor(buttonColor);
-    }
-
-    void renderTexts() {
-        std::ostringstream fpsStream;
-        std::ostringstream ballCountStream;
-
-        fpsStream << "FPS: " << static_cast<int>(currentFPS);
-        ballCountStream << "Balls Count: " << static_cast<int>(objCount);
-
-        fpsText.setString(fpsStream.str());
-        ballsCountText.setString(ballCountStream.str());
-
-        window.draw(fpsText);
-        window.draw(linkingText);
-        window.draw(ballsCountText);
-    }
-
-    void limitFrameRate() {
-        sf::Time elapsed = clock.restart();
-        if (elapsed.asSeconds() < deltaTime) {
-            sf::sleep(sf::seconds(deltaTime - elapsed.asSeconds()));
-        }
-    }
+protected:
 
     void handleEvent(sf::Event event) {
         if (event.type == sf::Event::Closed) { window.close(); }
@@ -575,6 +422,167 @@ private:
         }
     }
 
-protected:
     virtual void MoveAndDrawObjects() {}
 };
+
+
+class PhysicsSimulationLocal : public PhysicsSimulatotion {
+public:
+    PhysicsSimulationLocal(sf::RenderWindow& win) : PhysicsSimulatotion(win) {
+        initializeCursors();
+        loadResources();
+        initializeUI();
+        setupGradient();
+    }
+
+    std::string Run() {
+        currentMousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window), view);
+        handleSimulationEvents();
+        renderSimulation();
+        return screen;
+    }
+
+private:
+    void renderSimulation() {
+        updateFPS();
+        window.clear(background_color);
+        window.setView(view);
+
+        MoveAndDrawObjects();
+
+        window.setView(window.getDefaultView());
+        renderTexts();
+
+        window.display();
+
+        limitFrameRate();
+    }
+
+    void MoveAndDrawObjects() override {
+        objectList.MoveAndDraw(window, currentFPS, elastic, planetMode);
+    }
+
+    void initializeUI() {
+        setupText();
+        setupHeaders();
+    }
+
+    void initializeCursors() {
+        if (!defaultCursor.loadFromSystem(sf::Cursor::Arrow) ||
+            !handCursor.loadFromSystem(sf::Cursor::Hand)) {
+            throw std::runtime_error("Failed to load cursors");
+        }
+        window.setMouseCursor(defaultCursor);
+    }
+
+    void loadResources() {
+        if (!font.loadFromFile("font.ttf")) {
+            throw std::runtime_error("Failed to load font");
+        }
+        loadTextures();
+    }
+
+    void setupGradient() {
+        sf::Color startColor(128, 0, 128);  // purple
+        sf::Color endColor(0, 0, 255);      // blue
+        gradient = GenerateGradient(startColor, endColor, gradientStepMax);
+    }
+
+    std::vector<sf::Color> GenerateGradient(sf::Color startColor, sf::Color endColor, int steps) {
+        std::vector<sf::Color> gradient;
+        float stepR = (endColor.r - startColor.r) / static_cast<float>(steps - 1);
+        float stepG = (endColor.g - startColor.g) / static_cast<float>(steps - 1);
+        float stepB = (endColor.b - startColor.b) / static_cast<float>(steps - 1);
+
+        for (int i = 0; i < steps; ++i) {
+            gradient.push_back(sf::Color(
+                startColor.r + stepR * i,
+                startColor.g + stepG * i,
+                startColor.b + stepB * i
+            ));
+        }
+        return gradient;
+    }
+
+    void loadTextures() {
+        // Since no textures are used in the original code, this method is kept minimal
+        // but provides a hook for future texture loading if needed
+        try {
+            // Currently no textures are loaded as the simulation uses basic shapes
+            // If textures are needed in the future, they can be loaded here:
+            /*
+            sf::Texture texture;
+            if (!texture.loadFromFile("path/to/texture.png")) {
+                throw std::runtime_error("Failed to load texture");
+            }
+            */
+        }
+        catch (const std::exception& error) {
+            std::cerr << "Texture loading error: " << error.what() << std::endl;
+        }
+    }
+
+    void updateFPS() {
+        frameCount++;
+        float timeElapsed = fpsClock.getElapsedTime().asSeconds();
+
+        if (timeElapsed >= 1.0f) {
+            currentFPS = frameCount / timeElapsed;
+            frameCount = 0;
+            fpsClock.restart();
+        }
+    }
+
+    void setupText() {
+        // FPS Text
+        fpsText.setFont(font);
+        fpsText.setCharacterSize(20);
+        fpsText.setFillColor(sf::Color::White);
+        fpsText.setPosition(10, 10);
+
+        // Balls Count Text
+        ballsCountText.setFont(font);
+        ballsCountText.setCharacterSize(20);
+        ballsCountText.setFillColor(sf::Color::White);
+        ballsCountText.setPosition(10, 40);
+
+        // Linking Text
+        linkingText.setFont(font);
+        linkingText.setString("DEACTIVATED");
+        linkingText.setCharacterSize(20);
+        linkingText.setFillColor(sf::Color::White);
+        linkingText.setPosition(10, 70);
+    }
+
+    void setupHeaders() {
+        headerText.setSize(sf::Vector2f(400.f, 100.f));
+        headerText.setPosition(
+            options.window_width / 2.f - headerText.getSize().x / 2.f,
+            100.f
+        );
+        headerText.setFillColor(buttonColor);
+    }
+
+    void renderTexts() {
+        std::ostringstream fpsStream;
+        std::ostringstream ballCountStream;
+
+        fpsStream << "FPS: " << static_cast<int>(currentFPS);
+        ballCountStream << "Balls Count: " << static_cast<int>(objCount);
+
+        fpsText.setString(fpsStream.str());
+        ballsCountText.setString(ballCountStream.str());
+
+        window.draw(fpsText);
+        window.draw(linkingText);
+        window.draw(ballsCountText);
+    }
+
+    void limitFrameRate() {
+        sf::Time elapsed = clock.restart();
+        if (elapsed.asSeconds() < deltaTime) {
+            sf::sleep(sf::seconds(deltaTime - elapsed.asSeconds()));
+        }
+    }
+};
+
