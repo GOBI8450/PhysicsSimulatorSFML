@@ -12,6 +12,7 @@
 #include <ctime>   // For seeding with current time
 #include <boost\asio.hpp>
 #include "PhysicsSimulatotion.h"
+#include "Options.h"
 
 class MainMenu
 {
