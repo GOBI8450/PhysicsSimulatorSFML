@@ -19,6 +19,21 @@ public:
         linked = -1;
         acceleration = sf::Vector2f(0, gravity ); //(x axis, y axis)
     }
+    // Copy constructor
+    BaseShape(const BaseShape& other)
+        : oldPosition(other.oldPosition),
+        acceleration(other.acceleration),
+        color(other.color),
+        gravity(other.gravity),
+        mass(other.mass),
+        fps(other.fps),
+        linked(other.linked)
+    {}
+
+    ~BaseShape() {
+        //will add if needed now not i guess
+    }
+
 
     //Updates the position following varlet integration. meaning we calculate the next position based on the previos one and with time
     virtual void updatePositionVerlet(float dt){}
@@ -87,5 +102,11 @@ public:
     void SetLinked(bool isLinked) { linked = isLinked; }
 
     int GetLinked() { return linked; }
+
+    virtual void SetOutline(sf::Color color, float thickness) {}
+
+
+    sf::Color GetColor() { return color; }
+
 };
 
