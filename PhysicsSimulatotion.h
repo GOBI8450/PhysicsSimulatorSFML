@@ -36,16 +36,18 @@ protected:
     sf::Cursor defaultCursor;
 
     std::string screen = "START";
+
     bool hovering = false;
     bool connectingMode = false;
     bool planetMode = false;
+    bool enableCollison = true;
+    bool borderless=false;
 
     // Physics and simulation parameters
-    float gridSize = 20;
     float lineLength = 150;
     ObjectsList objectList;
     float deltaTime = 1.0f / 60.0f;
-    float elastic = 0;
+    float elastic = 0.0;
     int objCount = 0;
     float radius = 50;
 
@@ -459,7 +461,7 @@ private:
     }
 
     void MoveAndDrawObjects() override {
-        objectList.MoveAndDraw(window, currentFPS, elastic, planetMode);
+        objectList.MoveAndDraw(window, currentFPS, elastic, planetMode,enableCollison,borderless);
     }
 
     void initializeUI() {
