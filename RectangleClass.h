@@ -4,36 +4,36 @@
 #include "BaseShape.h"
 #include "Circle.h"
 
-class Rectangle: public BaseShape, public sf::RectangleShape
+class RectangleClass : public BaseShape, public sf::RectangleShape
 {
 private:
-	float width;
-	float height;
+    float width;
+    float height;
     sf::Vector2f velocity;
 
 public:
     // Constructor with radius, color, gravity, mass
-    Rectangle(float width, float height,sf::Color color, float gravity, double mass)
+    RectangleClass(float width, float height, sf::Color color, float gravity, double mass)
         : BaseShape(color, gravity, mass), width(width), height(height)
     {
         setSize(sf::Vector2f(width, height));
         setFillColor(color);
-        setOrigin(width/2, height/2);
-        setPosition(width/2, height/2);
+        setOrigin(width / 2, height / 2);
+        setPosition(width / 2, height / 2);
         oldPosition = sf::Vector2f(width, height);
-        acceleration = sf::Vector2f(0, gravity*100); //(x axis, y axis)
+        acceleration = sf::Vector2f(0, gravity * 100); //(x axis, y axis)
     }
 
     // Constructor with radius, color, gravity, mass, position
-    Rectangle(float width,float height,sf::Color color, sf::Vector2f pos, float gravity, double mass)
-        : BaseShape(color, gravity, mass), width(width),height(height)
+    RectangleClass(float width, float height, sf::Color color, sf::Vector2f pos, float gravity, double mass)
+        : BaseShape(color, gravity, mass), width(width), height(height)
     {
         setSize(sf::Vector2f(width, height));
         setFillColor(color);
         setOrigin(width / 2, height / 2);
         setPosition(pos);
         oldPosition = pos;
-        acceleration = sf::Vector2f(0, gravity*100);//(x axis, y axis)
+        acceleration = sf::Vector2f(0, gravity * 100);//(x axis, y axis)
     }
 
     void SetVelocity(const sf::Vector2f& newVelocity) override {
@@ -86,7 +86,7 @@ public:
         window.draw(*this);
     }
 
-   
+
 
 
 
@@ -95,13 +95,13 @@ public:
         sf::Vector2u windowSize = window.getSize();
         float energyLossFactor = 0;// If you wanna add energy loss
         //as the origin point is set to the center of the circle the point will be always radius far away from its edges
-        if (pos.x - width/2 < 0)
+        if (pos.x - width / 2 < 0)
         {
             oldPosition.x = pos.x;
             pos.x = width / 2;
             oldPosition.x = pos.x + (pos.x - oldPosition.x) * energyLossFactor; // 0.9f Damping factor
         }
-        else if (pos.x + width/2 > windowSize.x)
+        else if (pos.x + width / 2 > windowSize.x)
         {
             oldPosition.x = pos.x;
             pos.x = windowSize.x - width / 2;
@@ -126,7 +126,7 @@ public:
 
 
 
-    double FindOverlap(Rectangle* otherRec) {
+    double FindOverlap(RectangleClass* otherRec) {
         sf::Vector2f pos = GetPosition();
         sf::Vector2f otherPos = otherRec->GetPosition();
 
@@ -185,7 +185,7 @@ public:
     }
 
     //Checks if there is any collision between two Rectangles
-    bool IsCollision(Rectangle* otherRec) {
+    bool IsCollision(RectangleClass* otherRec) {
 
         sf::Vector2f pos = GetPosition();
         sf::Vector2f otherPos = otherRec->GetPosition();
@@ -216,7 +216,7 @@ public:
         return false;
     }
 
-    void HandleCollision(Rectangle* otherRec) {
+    void HandleCollision(RectangleClass* otherRec) {
         if (IsCollision(otherRec))
         {
             // Get positions of both circles
@@ -298,7 +298,7 @@ public:
         return false;
     }
 
-    void HandleCollisionElastic(Rectangle* otherRec, float elastic){}///!!!!!!!!!!//// fill
+    void HandleCollisionElastic(RectangleClass* otherRec, float elastic) {}///!!!!!!!!!!//// fill
 
     float GetHeight() {
         return height;
@@ -312,11 +312,16 @@ public:
     {
         setPosition(newPos);
     }
-    
-    void SetSizeAndOrigin(float newWidth,float newHeight) {
+
+    void SetSizeAndOrigin(float newWidth, float newHeight) {
         width = newWidth;
         height = newHeight;
         setOrigin(width, height);
+    }
+
+    void SetOutline(sf::Color color, float thickness) override {
+        setOutlineThickness(thickness);
+        setOutlineColor(color);
     }
 
     sf::Vector2f GetPosition() override {
