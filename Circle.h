@@ -35,6 +35,7 @@ public:
         oldPosition = pos;
         acceleration = sf::Vector2f(0, gravity * 100);//(x axis, y axis)
         SetVelocity(initialVel);
+        //SetOutline(sf::Color(255, 255, 255), 0.5);  // cool visual
     }
 
     void SetVelocity(const sf::Vector2f& newVelocity) override {
@@ -220,9 +221,26 @@ public:
         setPosition(newPos);
     }
 
+    void SetRadius(float newRadius)
+    {
+        setRadius(newRadius);
+        radius = newRadius;
+        setOrigin(sf::Vector2f(radius,radius));
+    }
+
+    float GetRadius() {
+        return radius;
+    }
+
     sf::Vector2f GetPosition() override {
         return getPosition();
     }
+
+    void SetOutline(sf::Color color, float thickness) override {
+        setOutlineThickness(thickness);
+        setOutlineColor(color);
+    }
+
 
     // Function to draw the circle
     void draw(sf::RenderWindow& window)
