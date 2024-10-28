@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 #include <random>
 #include "Grid.h"
@@ -16,7 +17,7 @@ class ObjectsList
 private:
     int ballCount = 0;
     std::mt19937 rnd;
-    Grid grid;
+    Grid* grid;
     std::vector<Planet*> planetList;
     float lineLength;
 
@@ -43,7 +44,7 @@ public:
     }
 
     BaseShape* CreateNewCircle(float gravity, sf::Color color, sf::Vector2f pos, sf::Vector2f initialVel) {
-        std::uniform_int_distribution<int> radiusRange(15, 15);
+        std::uniform_int_distribution<int> radiusRange(30, 30);
         std::uniform_int_distribution<int> rndXRange(300, 500);  // Replace 920 with actual window width
         // std::uniform_int_distribution<int> rndYRange(50, 1280 - 50); // Replace 1280 with actual window height
 
@@ -76,7 +77,7 @@ public:
         int mass = (randomWidth + randomHeight) * 2;//no real meaning for the multiply
         sf::Vector2f position(pos);
 
-        BaseShape* ball = new Rectangle(randomWidth, randomHeight, color, position, gravity, mass);
+        BaseShape* ball = new RectangleClass(randomWidth, randomHeight, color, position, gravity, mass);
         ballsList.push_back(ball); // Pushing back the BaseShape* into the vector
         ballCount += 1;
 
@@ -96,12 +97,12 @@ public:
                         circle->handleWallCollision(window);
                     }
                     // Check if obj is a Rectangle
-                    else if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
+                    else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
                         rectangle->handleWallCollision(window);
                     }
 
                     // Get nearby objects for collision handling
-                    std::vector<BaseShape*> potentialCollisions = grid.GetNerbyCellsObjects(obj);
+                    std::vector<BaseShape*> potentialCollisions = grid->GetNerbyCellsObjects(obj);
 
                     for (auto& otherObj : potentialCollisions) {
                         // Handle Circle to Circle collision
@@ -113,15 +114,15 @@ public:
                             }
                         }
                         // Handle Rectangle to other object collision
-                        else if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
-                            if (Rectangle* otherRectangle = dynamic_cast<Rectangle*>(otherObj))
+                        else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
+                            if (RectangleClass* otherRectangle = dynamic_cast<RectangleClass*>(otherObj))
                             {
                                 if (rectangle != otherRectangle) {
                                     rectangle->HandleCollision(otherRectangle); // Handle collision with any other shape
                                 }
                             }
                         }
-                        if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
+                        if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
                             if (Circle* otherCircle = dynamic_cast<Circle*>(otherObj))
                             {
                                 rectangle->HandleCollision(otherCircle); // Handle collision with any other shape
@@ -129,7 +130,7 @@ public:
                             std::cout << "recCir";
                         }
                         else if (Circle* otherCircle = dynamic_cast<Circle*>(otherObj)) {
-                            if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj))
+                            if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj))
                             {
                                 rectangle->HandleCollision(otherCircle); // Handle collision with any other shape
                             }
@@ -147,12 +148,12 @@ public:
                         circle->handleWallCollision(window);
                     }
                     // Check if obj is a Rectangle
-                    else if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
+                    else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
                         rectangle->handleWallCollision(window);
                     }
 
                     // Get nearby objects for collision handling
-                    std::vector<BaseShape*> potentialCollisions = grid.GetNerbyCellsObjects(obj);
+                    std::vector<BaseShape*> potentialCollisions = grid->GetNerbyCellsObjects(obj);
 
                     for (auto& otherObj : potentialCollisions) {
                         // Handle Circle to Circle collision
@@ -164,8 +165,8 @@ public:
                             }
                         }
                         // Handle Rectangle to other object collision
-                        else if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
-                            if (Rectangle* otherRectangle = dynamic_cast<Rectangle*>(otherObj))
+                        else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
+                            if (RectangleClass* otherRectangle = dynamic_cast<RectangleClass*>(otherObj))
                             {
                                 if (rectangle != otherRectangle) {
                                     rectangle->HandleCollisionElastic(otherRectangle, elastic); // Handle collision with any other shape
@@ -187,12 +188,12 @@ public:
                     circle->handleWallCollision(window);
                 }
                 // Check if obj is a Rectangle
-                else if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
+                else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
                     rectangle->handleWallCollision(window);
                 }
 
                 // Get nearby objects for collision handling
-                std::vector<BaseShape*> potentialCollisions = grid.GetNerbyCellsObjects(obj);
+                std::vector<BaseShape*> potentialCollisions = grid->GetNerbyCellsObjects(obj);
 
                 for (auto& otherObj : potentialCollisions) {
                     // Handle Circle to Circle collision
@@ -204,22 +205,22 @@ public:
                         }
                     }
                     // Handle Rectangle to other object collision
-                    else if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
-                        if (Rectangle* otherRectangle = dynamic_cast<Rectangle*>(otherObj))
+                    else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
+                        if (RectangleClass* otherRectangle = dynamic_cast<RectangleClass*>(otherObj))
                         {
                             if (rectangle != otherRectangle) {
                                 rectangle->HandleCollision(otherRectangle); // Handle collision with any other shape
                             }
                         }
                     }
-                    if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
+                    if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
                         if (Circle* otherCircle = dynamic_cast<Circle*>(otherObj))
                         {
                             rectangle->HandleCollision(otherCircle); // Handle collision with any other shape
                         }
                     }
                     else if (Circle* otherCircle = dynamic_cast<Circle*>(otherObj)) {
-                        if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj))
+                        if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj))
                         {
                             rectangle->HandleCollision(otherCircle); // Handle collision with any other shape
                         }
@@ -234,12 +235,12 @@ public:
                     circle->handleWallCollision(window);
                 }
                 // Check if obj is a Rectangle
-                else if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
+                else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
                     rectangle->handleWallCollision(window);
                 }
 
                 // Get nearby objects for collision handling
-                std::vector<BaseShape*> potentialCollisions = grid.GetNerbyCellsObjects(obj);
+                std::vector<BaseShape*> potentialCollisions = grid->GetNerbyCellsObjects(obj);
 
                 for (auto& otherObj : potentialCollisions) {
                     // Handle Circle to Circle collision
@@ -251,8 +252,8 @@ public:
                         }
                     }
                     // Handle Rectangle to other object collision
-                    else if (Rectangle* rectangle = dynamic_cast<Rectangle*>(obj)) {
-                        if (Rectangle* otherRectangle = dynamic_cast<Rectangle*>(otherObj))
+                    else if (RectangleClass* rectangle = dynamic_cast<RectangleClass*>(obj)) {
+                        if (RectangleClass* otherRectangle = dynamic_cast<RectangleClass*>(otherObj))
                         {
                             if (rectangle != otherRectangle) {
                                 rectangle->HandleCollisionElastic(otherRectangle, elastic); // Handle collision with any other shape
@@ -265,23 +266,45 @@ public:
         }
     }
 
-    BaseShape* IsInRadius(sf::Vector2i pointPos) {
-        return grid.IsInGridRadius(pointPos); // Return nullptr if no ball contains the point
+    BaseShape* IsInRadius(sf::Vector2f pointPos) {
+        return grid->IsInGridRadius(pointPos); // Return nullptr if no ball contains the point
+    }
+
+    void DeleteThisObj(BaseShape* obj) {
+        auto potentialErased = std::find(ballsList.begin(), ballsList.end(), obj);
+
+        // If found, erase it from the vector
+        if (potentialErased != ballsList.end()) {
+            ballsList.erase(potentialErased);
+        }
+        delete obj;
     }
 
 
-    void MoveAndDraw(sf::RenderWindow& window, float fps, float elastic,bool planetMode) {
-        grid.clear(); // Clear the grid
+    void MoveAndDraw(sf::RenderWindow& window, float fps, float elastic,bool planetMode, bool enableCollison, bool borderless) {
+        if (borderless)
+        {
+            grid = new GridUnorderd();
+        }
+        else
+        {
+            grid = new GridFixed();
+        }
+
+        grid->clear(); // Clear the grid
 
         for (auto& ball : ballsList) {
-            grid.InsertObj(ball); // Inserting BaseShape* objects
+            grid->InsertObj(ball); // Inserting BaseShape* objects
         }
 
         if (fps <= 0) {
             fps = 60;
         }
         float deltaTime = 1 / fps; // Calculate deltaTime for movement
-        HandleAllCollisions(window, elastic);
+        if (enableCollison)
+        {
+            HandleAllCollisions(window, elastic);
+        }
         for (auto& planet : planetList)
         {
             for (auto& ball : ballsList) {
@@ -292,6 +315,7 @@ public:
             }
         }
         connectedObjects.Draw(window);
+        grid->DrawGrids(window);
         if (planetMode)
         {
             for (auto& ball : ballsList) {
