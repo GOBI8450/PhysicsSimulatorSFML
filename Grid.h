@@ -14,6 +14,8 @@ protected:
 public:
 	virtual ~Grid() = default;
 
+	Grid(){};
+
 	// Insert the circle by getting the hash Key and putting it in the unordered map 
 	virtual void InsertObj(BaseShape* obj) {}
 
@@ -63,7 +65,7 @@ private:
 	}
 
 public:
-	GridUnorderd() {}; // Constructor
+	GridUnorderd() : Grid() {}; // Constructor
 
 	// Insert the circle by getting the hash Key and putting it in the unordered map 
 	void InsertObj(BaseShape* obj) override {
@@ -220,7 +222,7 @@ private:
 	int gridSize = 3;
 
 public:
-	GridFixed() {}
+	GridFixed(): Grid() {}
 
 	void InsertObj(BaseShape* obj) override {
 		int gridColumn = GetGridColumn(obj);
