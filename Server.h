@@ -25,18 +25,18 @@ using boost::asio::ip::udp;
 
 class Server {
 public:
-    Server(boost::asio::io_context& io_context, unsigned short tcp_port, unsigned short udp_port)
-        : tcp_acceptor_(io_context, tcp::endpoint(tcp::v4(), tcp_port)),
-        udp_socket_(io_context, udp::endpoint(udp::v4(), udp_port)),
-        tcp_port_(tcp_port),
-        udp_port_(udp_port) {
-        std::cout << "Server started on TCP port " << tcp_port_ << " and UDP port " << udp_port_ << std::endl;
+    Server(boost::asio::io_context& io_context, unsigned short tcpPort, unsigned short udpPort)
+        : tcpAcceptor(io_context, tcp::endpoint(tcp::v4(), tcpPort)),
+        udpSocket(io_context, udp::endpoint(udp::v4(), udpPort)),
+        tcpPort(tcpPort),
+        udpPort(udpPort) {
+        std::cout << "Server started on TCP port " << tcpPort << " and UDP port " << udpPort << std::endl;
     }
 
-    void start() {
-        accept_tcp_connection();
-        receive_udp();
-        start_console_input();
+    void Start() {
+        AcceptTCPConnection();
+        ReceiveUDP();
+        StartConsoleInput();
     }
 
 private:
@@ -45,7 +45,7 @@ private:
         TcpConnection(tcp::socket socket, Server& server)
             : socket_(std::move(socket)),
             server_(server),
-            client_id_(++next_id_) {
+            client_id_(++nextID) {
             address_ = socket_.remote_endpoint().address().to_string();
             port_ = socket_.remote_endpoint().port();
         }
@@ -61,6 +61,11 @@ private:
             if (!write_in_progress) {
                 do_write();
             }
+        }
+
+        void send_shapes(const std::vector<BaseShape>& shapes) {
+            std::string serializedShapes = server_.SerializeBaseShapeVector(shapes);
+            send_message(serializedShapes);
         }
 
         tcp::socket& Socket() { return socket_; }
@@ -81,12 +86,23 @@ private:
                             boost::asio::buffers_begin(buffer_.data()) + length);
                         buffer_.consume(length);
 
-                        std::cout << "Client " << client_id_ << ": " << message;
+                        std::cout << "Client " << client_id_ << ": " << message << std::endl;
+
+                        // Check if the message is a serialized vector of BaseShape objects
+                        if (message.length() > 2 && message[0] == 'B' && message[1] == 'S') {
+                            std::vector<BaseShape> shapes = server_.DeserializeBaseShapeVector(message.substr(2));
+                            std::cout << "Received " << shapes.size() << " shapes from client " << client_id_ << std::endl;
+                            // Process the shapes as needed
+                        }
+                        else {
+                            // Handle regular string message
+                            server_.HandleClientMessage(client_id_, message);
+                        }
 
                         read_message();
                     }
                     else {
-                        server_.handle_client_disconnect(client_id_);
+                        server_.HandleClientDisconnect(client_id_);
                     }
                 });
         }
@@ -104,7 +120,7 @@ private:
                         }
                     }
                     else {
-                        server_.handle_client_disconnect(client_id_);
+                        server_.HandleClientDisconnect(client_id_);
                     }
                 });
         }
@@ -116,56 +132,79 @@ private:
         std::string address_;
         unsigned short port_;
         int client_id_;
-        static int next_id_;
+        static int nextID;
     };
 
-    std::string serializeBaseShapeVector(const std::vector<BaseShape>& shapes) {
-        std::ostringstream oss;                    // Output string stream to hold binary data
-        boost::archive::binary_oarchive oa(oss);   // Binary output archive for serialization
-        oa << shapes;                              // Serialize the vector of BaseShape
-        return oss.str();                          // Return serialized data as a string
+    tcp::acceptor tcpAcceptor;
+    udp::socket udpSocket;
+    udp::endpoint udpSenderEndpoint;
+    enum { max_length = 1024 };
+    char udpData[max_length];
+    unsigned short tcpPort;
+    unsigned short udpPort;
+    std::map<int, std::shared_ptr<TcpConnection>> tcpConnections;
+
+    std::string SerializeBaseShapeVector(const std::vector<BaseShape>& shapes) {
+        std::ostringstream oss;
+        boost::archive::binary_oarchive oa(oss);
+        oa << shapes;
+        return "BS" + oss.str(); // Prepend "BS" to indicate serialized shapes
     }
 
-    std::vector<BaseShape> deserializeBaseShapeVector(const std::string& serializedData) {
+    std::vector<BaseShape> DeserializeBaseShapeVector(const std::string& serializedData) {
         std::istringstream iss(serializedData);
         boost::archive::binary_iarchive ia(iss);
         std::vector<BaseShape> shapes;
-        ia >> shapes;  // Deserialize the vector of BaseShape
+        ia >> shapes;
         return shapes;
     }
 
-    void accept_tcp_connection() {
-        tcp_acceptor_.async_accept(
+    void AcceptTCPConnection() {
+        tcpAcceptor.async_accept(
             [this](boost::system::error_code ec, tcp::socket socket) {
                 if (!ec) {
                     auto connection = std::make_shared<TcpConnection>(std::move(socket), *this);
-                    tcp_connections_[connection->ID()] = connection;
+                    tcpConnections[connection->ID()] = connection;
                     connection->start();
                 }
-                accept_tcp_connection();
+                AcceptTCPConnection();
             });
     }
 
-    void handle_client_disconnect(int client_id) {
-        auto it = tcp_connections_.find(client_id);
-        if (it != tcp_connections_.end()) {
+    void HandleClientDisconnect(int client_id) {
+        auto it = tcpConnections.find(client_id);
+        if (it != tcpConnections.end()) {
             std::cout << "Client " << client_id << " disconnected from "
                 << it->second->Address() << ":" << it->second->Port() << std::endl;
-            tcp_connections_.erase(it);
+            tcpConnections.erase(it);
         }
     }
 
-    void broadcast_tcp_message(const std::string& message) {
-        for (auto& conn : tcp_connections_) {
-            conn.second->send_message("Broadcast: " + message);
-        }
-        std::cout << "Broadcasted to " << tcp_connections_.size() << " clients: " << message << std::endl;
+    void HandleClientMessage(int client_id, const std::string& message) {
+        // Handle regular string messages from clients
+        std::cout << "Received message from client " << client_id << ": " << message << std::endl;
+        // Process the message as needed
     }
 
-    void send_to_client(int client_id, const std::string& message) {
-        auto it = tcp_connections_.find(client_id);
-        if (it != tcp_connections_.end()) {
-            it->second->send_message("Direct message: " + message);
+    void BroadcastTcpMessage(const std::string& message) {
+        for (auto& conn : tcpConnections) {
+            conn.second->send_message(message);
+        }
+        std::cout << "Broadcasted to " << tcpConnections.size() << " clients: " << message << std::endl;
+    }
+
+    void BroadcastShapes(const std::vector<BaseShape>& shapes) {
+        std::string serializedShapes = SerializeBaseShapeVector(shapes);
+        for (auto& conn : tcpConnections) {
+            conn.second->send_shapes(shapes);
+        }
+        std::cout << "Broadcasted " << shapes.size() << " shapes to " << tcpConnections.size() << " clients" << std::endl;
+    }
+
+    void SendToClient(int client_id, const std::string& message) {
+        auto it = tcpConnections.find(client_id);
+        if (it != tcpConnections.end()) {
+            it->second->send_message(message);
             std::cout << "Sent to client " << client_id << ": " << message << std::endl;
         }
         else {
@@ -173,26 +212,31 @@ private:
         }
     }
 
-    void start_console_input() {
+    void StartConsoleInput() {
         std::thread input_thread([this]() {
             std::string input;
             while (std::getline(std::cin, input)) {
                 if (input.substr(0, 2) == "b:") {
                     // Broadcast message
-                    broadcast_tcp_message(input.substr(2));
+                    BroadcastTcpMessage(input.substr(2));
+                }
+                else if (input.substr(0, 2) == "s:") {
+                    // Broadcast shapes
+                    std::vector<BaseShape> shapes = { /* Create some sample shapes */ };
+                    BroadcastShapes(shapes);
                 }
                 else if (input.substr(0, 2) == "c:") {
                     // Send to specific client
                     size_t space_pos = input.find(' ', 2);
                     if (space_pos != std::string::npos) {
                         int client_id = std::stoi(input.substr(2, space_pos - 2));
-                        send_to_client(client_id, input.substr(space_pos + 1));
+                        SendToClient(client_id, input.substr(space_pos + 1));
                     }
                 }
                 else if (input == "list") {
                     // List all connected clients
                     std::cout << "Connected clients:" << std::endl;
-                    for (const auto& conn : tcp_connections_) {
+                    for (const auto& conn : tcpConnections) {
                         std::cout << "Client " << conn.first << " - "
                             << conn.second->Address() << ":" << conn.second->Port() << std::endl;
                     }
@@ -202,45 +246,39 @@ private:
         input_thread.detach();
     }
 
-    void receive_udp() {
-        udp_socket_.async_receive_from(
-            boost::asio::buffer(udp_data_, max_length), udp_sender_endpoint_,
+    void ReceiveUDP() {
+        udpSocket.async_receive_from(
+            boost::asio::buffer(udpData, max_length), udpSenderEndpoint,
             [this](boost::system::error_code ec, std::size_t bytes_recvd) {
                 if (!ec) {
+                    std::string message(udpData, bytes_recvd);
                     std::cout << "UDP received from "
-                        << udp_sender_endpoint_.address().to_string()
-                        << ": " << std::string(udp_data_, bytes_recvd)
+                        << udpSenderEndpoint.address().to_string()
+                        << ": " << message
                         << std::endl;
 
-                    udp_socket_.async_send_to(
-                        boost::asio::buffer(udp_data_, bytes_recvd),
-                        udp_sender_endpoint_,
+                    // Echo the message back to the sender
+                    udpSocket.async_send_to(
+                        boost::asio::buffer(udpData, bytes_recvd),
+                        udpSenderEndpoint,
                         [](boost::system::error_code /*ec*/, std::size_t /*bytes_sent*/) {});
                 }
-                receive_udp();
+                ReceiveUDP();
             });
     }
-
-    tcp::acceptor tcp_acceptor_;
-    udp::socket udp_socket_;
-    udp::endpoint udp_sender_endpoint_;
-    enum { max_length = 1024 };
-    char udp_data_[max_length];
-    unsigned short tcp_port_;
-    unsigned short udp_port_;
-    std::map<int, std::shared_ptr<TcpConnection>> tcp_connections_;
 };
 
-int Server::TcpConnection::next_id_ = 0;
+int Server::TcpConnection::nextID = 0;
 
 int main() {
     try {
         boost::asio::io_context io_context;
         Server server(io_context, 8080, 8081);
-        server.start();
+        server.Start();
 
         std::cout << "\nServer commands:" << std::endl;
         std::cout << "b:<message> - broadcast message to all clients" << std::endl;
+        std::cout << "s: - broadcast shapes to all clients" << std::endl;
         std::cout << "c:<client_id> <message> - send message to specific client" << std::endl;
         std::cout << "list - list all connected clients" << std::endl;
 
